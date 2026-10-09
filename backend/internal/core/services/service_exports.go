@@ -144,6 +144,14 @@ var exportTables = []tableSpec{
 		deferCols: map[string]string{"entity_children": entitiesTable},
 	},
 	{
+		// Additive to schema version 1: old archives omit this file, and
+		// entities without offboarded use the database's active default.
+		name:   "entity_offboardings",
+		scope:  "entity_id IN (SELECT id FROM entities WHERE group_entities = ?)",
+		pkCol:  "id",
+		fkCols: map[string]string{"entity_id": entitiesTable},
+	},
+	{
 		name:   "entity_fields",
 		scope:  "entity_fields IN (SELECT id FROM entities WHERE group_entities = ?)",
 		pkCol:  "id",
@@ -1311,6 +1319,15 @@ func (s *ExportService) replayImportRows(ctx context.Context, tx *sql.Tx, zr *zi
 			return nil, err
 		}
 		for _, row := range rows {
+			// History must belong to an entity in THIS archive. A raw FK
+			// fallback could otherwise attach it to an existing foreign tenant's
+			// entity, since the database FK alone does not enforce ownership.
+			if spec.name == "entity_offboardings" {
+				oldEntityID, ok := row["entity_id"].(string)
+				if !ok || idMap[entitiesTable][oldEntityID] == "" {
+					return nil, errors.New("offboarding history references an entity absent from the backup")
+				}
+			}
 			if err := coerceBoolColumns(row, boolCols); err != nil {
 				return nil, fmt.Errorf("insert %s: %w", spec.name, err)
 			}
