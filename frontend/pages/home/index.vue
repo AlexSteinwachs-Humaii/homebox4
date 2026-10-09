@@ -51,7 +51,7 @@
         to: "/items",
       },
       {
-        label: t("home.total_locations"),
+        label: t("menu.locations"),
         value: data?.totalLocations,
         note: t("home.collection_places"),
         to: "/locations",
@@ -93,9 +93,9 @@
     <Feedback v-if="!collectionId" :title="t('home.choose_collection')" />
     <section :aria-label="t('home.quick_statistics')" :aria-busy="statistics.pending.value">
       <div class="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        <Panel v-for="stat in stats" :key="stat.label" class="space-y-3 p-5">
+        <Panel v-for="stat in stats" :key="stat.label" class="relative space-y-3 p-5">
           <h2 class="font-sans text-sm text-muted-foreground">
-            <NuxtLink v-if="stat.to" :to="stat.to" class="habitat-link">{{ stat.label }}</NuxtLink>
+            <NuxtLink v-if="stat.to" :to="stat.to" class="habitat-link after:absolute after:inset-0">{{ stat.label }}</NuxtLink>
             <template v-else>{{ stat.label }}</template>
           </h2>
           <p class="text-3xl font-bold tabular-nums">{{ stat.value ?? "—" }}</p>
@@ -221,7 +221,10 @@
             <li v-for="location in locations.data.value" :key="location.id">
               <NuxtLink :to="`/location/${location.id}`" class="flex items-center gap-3">
                 <Thumbnail :src="imageUrl(location)" :name="location.name" :fallback-label="t('home.no_photo')" />
-                <span class="min-w-0 flex-1 break-words">{{ location.name }}</span>
+                <span class="min-w-0 flex-1">
+                  <span class="block break-words">{{ location.name }}</span>
+                  <span v-if="location.description" class="block break-words text-sm text-muted-foreground">{{ location.description }}</span>
+                </span>
                 <ArrowRight class="size-4 shrink-0 text-link" aria-hidden="true" />
               </NuxtLink>
             </li>

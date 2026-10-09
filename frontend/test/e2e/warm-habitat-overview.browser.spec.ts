@@ -4,7 +4,7 @@ import { overviewFixture } from "./overview-fixture";
 const destinations = [
   { name: "Item records", path: "/items" },
   { name: "Recorded purchase value", path: "/items" },
-  { name: "Total Locations", path: "/locations", statistics: true },
+  { name: "Locations", path: "/locations", statistics: true },
   { name: "View inventory →", path: "/items" },
   { name: "Real fixture possession", path: "/item/tool", partial: true },
   { name: "Fixture garage: No photo", path: "/location/garage", partial: true },
@@ -40,6 +40,8 @@ test("View all links reach Inventory and Locations; tags remain a count, not a n
   await page.goBack();
   // A static-host history return may reload the document; wait for hydrated data before clicking.
   await expect(page.getByText("$60.00", { exact: true })).toBeVisible();
+  // Desktop Chrome is 720px tall; this control sits below the fold after returning.
+  await viewAll.nth(1).scrollIntoViewIfNeeded();
   await viewAll.nth(1).click();
   await expect(page).toHaveURL(/\/locations$/);
 });
