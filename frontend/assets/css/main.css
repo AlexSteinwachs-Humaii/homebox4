@@ -1211,6 +1211,14 @@ h6 {
   color: hsl(var(--sidebar-primary-foreground));
   font-weight: 600;
 }
+/* Default menu colour must not override intentional button foregrounds.
+   Collapsed sign-out uses a pale destructive fill; its icon is currentColor. */
+.theme-warm-habitat [data-sidebar='menu-button'].text-primary-foreground {
+  color: hsl(var(--primary-foreground));
+}
+.theme-warm-habitat .group[data-collapsible='icon'] [data-sidebar='menu-button'].group-data-\[collapsible\=icon\]\:text-destructive-foreground {
+  color: hsl(var(--destructive-foreground));
+}
 .theme-warm-habitat .habitat-shell main {
   background: hsl(var(--background));
 }

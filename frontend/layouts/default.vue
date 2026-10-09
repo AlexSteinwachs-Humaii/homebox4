@@ -20,7 +20,7 @@
       <Sidebar collapsible="icon">
         <SidebarHeader class="items-center">
           <NuxtLink
-            class="flex items-center gap-3 py-3 text-2xl font-semibold group-data-[collapsible=icon]:hidden"
+            class="flex items-center gap-3 py-3 text-2xl font-semibold text-sidebar-foreground group-data-[collapsible=icon]:hidden"
             to="/home"
             aria-label="HomeBox"
           >
