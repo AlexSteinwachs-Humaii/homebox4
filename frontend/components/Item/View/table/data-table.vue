@@ -1,5 +1,6 @@
 <script setup lang="ts" generic="TData, TValue">
   import BaseCard from "@/components/Base/Card.vue";
+  import { defaultReportingColumns } from "~/lib/reporting-csv";
   import type { ColumnDef, SortingState, VisibilityState, ExpandedState } from "@tanstack/vue-table";
   import {
     getCoreRowModel,
@@ -43,7 +44,7 @@
   const preferences = useViewPreferences();
   const defaultPageSize = preferences.value.itemsPerTablePage;
   const tableHeadersData = preferences.value.tableHeaders;
-  const defaultVisible = ["name", "quantity", "insured", "purchasePrice"];
+  const defaultVisible = defaultReportingColumns;
 
   const tableHeaders = computed(
     () =>

@@ -3743,6 +3743,11 @@ paths:
         pageSize are ignored. Collection access is resolved by authenticated tenant
         middleware.
       parameters:
+      - description: 'JSON CSVPresentation: allowlisted visible columns with translated
+          labels, currency and short-date formatting captured from the table'
+        in: query
+        name: presentation
+        type: string
       - description: 'Search string (including #asset ID)'
         in: query
         name: q

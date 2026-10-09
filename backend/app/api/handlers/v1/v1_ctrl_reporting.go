@@ -1,8 +1,10 @@
 package v1
 
 import (
+	"encoding/json"
 	"errors"
 	"net/http"
+	"time"
 
 	"github.com/google/uuid"
 	"github.com/hay-kot/httpkit/errchain"
@@ -45,6 +47,7 @@ func (ctrl *V1Controller) HandleBillOfMaterialsExport() errchain.HandlerFunc {
 // @Description Accepts the same query parameters as GET /v1/entities; page and pageSize are ignored. Collection access is resolved by authenticated tenant middleware.
 // @Tags Reporting
 // @Produce text/csv
+// @Param presentation query string false "JSON CSVPresentation: allowlisted visible columns with translated labels, currency and short-date formatting captured from the table"
 // @Param q query string false "Search string (including #asset ID)"
 // @Param orderBy query string false "Dashboard order: name, assetId, createdAt or updatedAt"
 // @Param tags query []string false "Tag IDs" collectionFormat(multi)
@@ -65,19 +68,41 @@ func (ctrl *V1Controller) HandleFilteredReportingExport() errchain.HandlerFunc {
 		if ctx.GID == uuid.Nil || ctx.UID == uuid.Nil {
 			return validate.NewRequestError(errors.New("authenticated collection required"), http.StatusUnauthorized)
 		}
+		presentation, err := parseCSVPresentation(r)
+		if err != nil {
+			return validate.NewRequestError(err, http.StatusBadRequest)
+		}
 		// Parse once: later dashboard changes cannot mutate this request's inputs.
 		query := extractEntityQuery(r)
 		items, err := ctrl.repo.Entities.QueryAllByGroup(ctx, ctx.GID, query)
 		if err != nil {
 			return err
 		}
-		data, err := reporting.FilteredCSV(items)
+		data, err := reporting.FilteredCSV(items, presentation)
 		if err != nil {
 			return err
 		}
-		w.Header().Set("Content-Type", "text/csv; charset=utf-8")
-		w.Header().Set("Content-Disposition", "attachment; filename=filtered-report.csv")
-		_, err = w.Write(data)
+		_, err = writeFilteredCSV(w, data, time.Now())
 		return err
 	}
+}
+
+func parseCSVPresentation(r *http.Request) (reporting.CSVPresentation, error) {
+	p := reporting.DefaultCSVPresentation()
+	raw := r.URL.Query().Get("presentation")
+	if raw != "" {
+		if len(raw) > 8192 {
+			return p, errors.New("export presentation too large")
+		}
+		if err := json.Unmarshal([]byte(raw), &p); err != nil {
+			return p, errors.New("invalid export presentation")
+		}
+	}
+	return p, p.Validate()
+}
+
+func writeFilteredCSV(w http.ResponseWriter, data []byte, now time.Time) (int, error) {
+	w.Header().Set("Content-Type", "text/csv; charset=utf-8")
+	w.Header().Set("Content-Disposition", "attachment; filename=filtered-report-"+now.UTC().Format("2006-01-02")+".csv")
+	return w.Write(data)
 }

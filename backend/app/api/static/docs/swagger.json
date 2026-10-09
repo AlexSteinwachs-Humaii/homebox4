@@ -2255,6 +2255,12 @@
                 "parameters": [
                     {
                         "type": "string",
+                        "description": "JSON CSVPresentation: allowlisted visible columns with translated labels, currency and short-date formatting captured from the table",
+                        "name": "presentation",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
                         "description": "Search string (including #asset ID)",
                         "name": "q",
                         "in": "query"

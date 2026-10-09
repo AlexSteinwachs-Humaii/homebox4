@@ -2430,6 +2430,14 @@
                 "summary": "Export all filtered reporting results",
                 "parameters": [
                     {
+                        "description": "JSON CSVPresentation: allowlisted visible columns with translated labels, currency and short-date formatting captured from the table",
+                        "name": "presentation",
+                        "in": "query",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
                         "description": "Search string (including #asset ID)",
                         "name": "q",
                         "in": "query",
