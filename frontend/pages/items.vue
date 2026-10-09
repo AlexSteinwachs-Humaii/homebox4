@@ -307,19 +307,7 @@
 
     await router.push({ query: push_query as LocationQueryRaw });
 
-    const { data, error } = await api.items.getAll({
-      q: query.value || "",
-      parentIds: locIDs.value,
-      tags: tagIDs.value,
-      negateTags: negateTags.value,
-      onlyWithoutPhoto: onlyWithoutPhoto.value,
-      onlyWithPhoto: onlyWithPhoto.value,
-      includeArchived: includeArchived.value,
-      page: page.value,
-      pageSize: pageSize.value,
-      orderBy: orderBy.value,
-      fields,
-    });
+    const { data, error } = await api.items.getAll(exportQuery.value);
 
     function resetItems() {
       page.value = Math.max(1, page.value - 1);
@@ -384,6 +372,19 @@
       page.value = newPage;
     },
   });
+  const exportQuery = computed(() => ({
+    q: query.value || "",
+    parentIds: locIDs.value,
+    tags: tagIDs.value,
+    negateTags: negateTags.value,
+    onlyWithoutPhoto: onlyWithoutPhoto.value,
+    onlyWithPhoto: onlyWithPhoto.value,
+    includeArchived: includeArchived.value,
+    page: page.value,
+    pageSize: pageSize.value,
+    orderBy: orderBy.value,
+    fields: fieldTuples.value.filter(([name, value]) => name && value).map(([name, value]) => `${name}=${value}`),
+  }));
 </script>
 
 <template>
@@ -414,7 +415,9 @@
             <Label class="flex cursor-pointer items-center">
               <Switch v-model="includeArchived" class="ml-auto" />
               <div class="grow" />
-              <span class="text-right"> {{ $t("items.include_archive") }} </span>
+              <span class="text-right">
+                {{ $t("items.include_archive") }}
+              </span>
             </Label>
             <Label class="flex cursor-pointer items-center">
               <Switch v-model="fieldSelector" class="ml-auto" />
@@ -429,12 +432,16 @@
             <Label class="flex cursor-pointer items-center">
               <Switch v-model="onlyWithoutPhoto" class="ml-auto" />
               <div class="grow" />
-              <span class="text-right"> {{ $t("items.only_without_photo") }} </span>
+              <span class="text-right">
+                {{ $t("items.only_without_photo") }}
+              </span>
             </Label>
             <Label class="flex cursor-pointer items-center">
               <Switch v-model="onlyWithPhoto" class="ml-auto" />
               <div class="grow" />
-              <span class="text-right"> {{ $t("items.only_with_photo") }} </span>
+              <span class="text-right">
+                {{ $t("items.only_with_photo") }}
+              </span>
             </Label>
             <Label class="flex cursor-pointer flex-col gap-2">
               <span class="text-right">
@@ -447,8 +454,12 @@
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="name"> {{ $t("items.name") }} </SelectItem>
-                  <SelectItem value="createdAt"> {{ $t("items.created_at") }} </SelectItem>
-                  <SelectItem value="updatedAt"> {{ $t("items.updated_at") }} </SelectItem>
+                  <SelectItem value="createdAt">
+                    {{ $t("items.created_at") }}
+                  </SelectItem>
+                  <SelectItem value="updatedAt">
+                    {{ $t("items.updated_at") }}
+                  </SelectItem>
                 </SelectContent>
               </Select>
             </Label>
@@ -487,7 +498,9 @@
                 <SelectValue :placeholder="$t('items.select_field')" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem v-for="field in allFields" :key="field" :value="field"> {{ field }} </SelectItem>
+                <SelectItem v-for="field in allFields" :key="field" :value="field">
+                  {{ field }}
+                </SelectItem>
               </SelectContent>
             </Select>
           </div>
@@ -519,6 +532,7 @@
         :items="items"
         :location-flat-tree="locationFlatTree"
         :pagination="pagination"
+        :export-query="exportQuery"
         disable-sort
         @refresh="async () => search()"
       />

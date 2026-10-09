@@ -9,6 +9,7 @@ import type { EntitySummary } from "~/lib/api/types/data-contracts";
 import Currency from "~/components/global/Currency.vue";
 import DateTime from "~/components/global/DateTime.vue";
 import { cn } from "~/lib/utils";
+import { reportingColumnLabels } from "~/lib/reporting-csv";
 
 /**
  * Create columns with i18n support.
@@ -73,7 +74,7 @@ export function makeColumns({
             variant: "ghost",
             onClick: () => !disableSort && column.toggleSorting(column.getIsSorted() === "asc"),
           },
-          () => sortable(column, "items.asset_id")
+          () => sortable(column, reportingColumnLabels.assetId)
         ),
       cell: ({ row }) => h("div", { class: "text-sm" }, String(row.getValue("assetId") ?? "")),
     },
@@ -87,7 +88,7 @@ export function makeColumns({
             variant: "ghost",
             onClick: () => !disableSort && column.toggleSorting(column.getIsSorted() === "asc"),
           },
-          () => sortable(column, "items.name")
+          () => sortable(column, reportingColumnLabels.name)
         ),
       cell: ({ row }) => h("span", { class: "text-sm font-medium" }, row.getValue("name")),
     },
@@ -101,7 +102,7 @@ export function makeColumns({
             variant: "ghost",
             onClick: () => !disableSort && column.toggleSorting(column.getIsSorted() === "asc"),
           },
-          () => sortable(column, "items.quantity")
+          () => sortable(column, reportingColumnLabels.quantity)
         ),
       cell: ({ row }) => h("div", { class: "text-center" }, String(row.getValue("quantity") ?? "")),
     },
@@ -115,7 +116,7 @@ export function makeColumns({
             variant: "ghost",
             onClick: () => !disableSort && column.toggleSorting(column.getIsSorted() === "asc"),
           },
-          () => sortable(column, "items.insured")
+          () => sortable(column, reportingColumnLabels.insured)
         ),
       cell: ({ row }) => {
         const val = row.getValue("insured");
@@ -136,7 +137,7 @@ export function makeColumns({
             variant: "ghost",
             onClick: () => !disableSort && column.toggleSorting(column.getIsSorted() === "asc"),
           },
-          () => sortable(column, "items.purchase_price")
+          () => sortable(column, reportingColumnLabels.purchasePrice)
         ),
       cell: ({ row }) =>
         h("div", { class: "text-center" }, h(Currency, { amount: Number(row.getValue("purchasePrice")) })),
@@ -151,7 +152,7 @@ export function makeColumns({
             variant: "ghost",
             onClick: () => !disableSort && column.toggleSorting(column.getIsSorted() === "asc"),
           },
-          () => sortable(column, "items.location")
+          () => sortable(column, reportingColumnLabels.location)
         ),
       cell: ({ row }) => {
         const item = row.original as EntitySummary;
@@ -172,7 +173,7 @@ export function makeColumns({
             variant: "ghost",
             onClick: () => !disableSort && column.toggleSorting(column.getIsSorted() === "asc"),
           },
-          () => sortable(column, "items.archived")
+          () => sortable(column, reportingColumnLabels.archived)
         ),
       cell: ({ row }) => {
         const val = row.getValue("archived");
@@ -193,7 +194,7 @@ export function makeColumns({
             variant: "ghost",
             onClick: () => !disableSort && column.toggleSorting(column.getIsSorted() === "asc"),
           },
-          () => sortable(column, "items.created_at")
+          () => sortable(column, reportingColumnLabels.createdAt)
         ),
       cell: ({ row }) =>
         h(
@@ -212,7 +213,7 @@ export function makeColumns({
             variant: "ghost",
             onClick: () => !disableSort && column.toggleSorting(column.getIsSorted() === "asc"),
           },
-          () => sortable(column, "items.updated_at")
+          () => sortable(column, reportingColumnLabels.updatedAt)
         ),
       cell: ({ row }) =>
         h(

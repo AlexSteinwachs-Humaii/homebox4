@@ -269,6 +269,7 @@ func (a *app) mountRoutes(r *chi.Mux, chain *errchain.ErrChain, repos *repo.AllR
 		r.Get("/labelmaker/asset/{id}", chain.ToHandlerFunc(v1Ctrl.HandleGetAssetLabel(), userMW...))
 
 		// Reporting Services
+		r.Get("/reporting/filtered", chain.ToHandlerFunc(v1Ctrl.HandleFilteredReportingExport(), userMW...))
 		r.Get("/reporting/bill-of-materials", chain.ToHandlerFunc(v1Ctrl.HandleBillOfMaterialsExport(), userMW...))
 
 		// OpenTelemetry proxy endpoint for frontend telemetry (requires auth)

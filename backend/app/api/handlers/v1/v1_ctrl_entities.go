@@ -43,6 +43,58 @@ func startEntityCtrlSpan(ctx context.Context, name string, attrs ...attribute.Ke
 	return entityCtrlTracer().Start(ctx, name, trace.WithAttributes(attrs...))
 }
 
+// extractEntityQuery is shared by the dashboard and filtered reporting export.
+func extractEntityQuery(r *http.Request) repo.EntityQuery {
+	params := r.URL.Query()
+
+	filterFieldItems := func(raw []string) []repo.FieldQuery {
+		return lo.FilterMap(raw, func(v string, _ int) (repo.FieldQuery, bool) {
+			parts := strings.SplitN(v, "=", 2)
+			if len(parts) != 2 {
+				return repo.FieldQuery{}, false
+			}
+			return repo.FieldQuery{
+				Name:  parts[0],
+				Value: parts[1],
+			}, true
+		})
+	}
+
+	v := repo.EntityQuery{
+		Page:             queryIntOrNegativeOne(params.Get("page")),
+		PageSize:         queryIntOrNegativeOne(params.Get("pageSize")),
+		Search:           params.Get("q"),
+		ParentIDs:        queryUUIDList(params, "parentIds"),
+		TagIDs:           queryUUIDList(params, "tags"),
+		NegateTags:       queryBool(params.Get("negateTags")),
+		OnlyWithoutPhoto: queryBool(params.Get("onlyWithoutPhoto")),
+		OnlyWithPhoto:    queryBool(params.Get("onlyWithPhoto")),
+		IncludeArchived:  queryBool(params.Get("includeArchived")),
+		Fields:           filterFieldItems(params["fields"]),
+		OrderBy:          params.Get("orderBy"),
+	}
+
+	// Parse isLocation filter: "true" = locations only, "false" = items only, absent = default (items only)
+	if isLocStr := params.Get("isLocation"); isLocStr != "" {
+		isLoc := queryBool(isLocStr)
+		v.IsLocation = &isLoc
+	}
+
+	v.FilterChildren = queryBool(params.Get("filterChildren"))
+
+	if strings.HasPrefix(v.Search, "#") {
+		aidStr := strings.TrimPrefix(v.Search, "#")
+
+		aid, ok := repo.ParseAssetID(aidStr)
+		if ok {
+			v.Search = ""
+			v.AssetID = aid
+		}
+	}
+
+	return v
+}
+
 // HandleEntitiesGetAll godoc
 //
 //	@Summary	Query All Entities
@@ -57,59 +109,9 @@ func startEntityCtrlSpan(ctx context.Context, name string, attrs ...attribute.Ke
 //	@Router		/v1/entities [GET]
 //	@Security	Bearer
 func (ctrl *V1Controller) HandleEntitiesGetAll() errchain.HandlerFunc {
-	extractQuery := func(r *http.Request) repo.EntityQuery {
-		params := r.URL.Query()
-
-		filterFieldItems := func(raw []string) []repo.FieldQuery {
-			return lo.FilterMap(raw, func(v string, _ int) (repo.FieldQuery, bool) {
-				parts := strings.SplitN(v, "=", 2)
-				if len(parts) != 2 {
-					return repo.FieldQuery{}, false
-				}
-				return repo.FieldQuery{
-					Name:  parts[0],
-					Value: parts[1],
-				}, true
-			})
-		}
-
-		v := repo.EntityQuery{
-			Page:             queryIntOrNegativeOne(params.Get("page")),
-			PageSize:         queryIntOrNegativeOne(params.Get("pageSize")),
-			Search:           params.Get("q"),
-			ParentIDs:        queryUUIDList(params, "parentIds"),
-			TagIDs:           queryUUIDList(params, "tags"),
-			NegateTags:       queryBool(params.Get("negateTags")),
-			OnlyWithoutPhoto: queryBool(params.Get("onlyWithoutPhoto")),
-			OnlyWithPhoto:    queryBool(params.Get("onlyWithPhoto")),
-			IncludeArchived:  queryBool(params.Get("includeArchived")),
-			Fields:           filterFieldItems(params["fields"]),
-			OrderBy:          params.Get("orderBy"),
-		}
-
-		// Parse isLocation filter: "true" = locations only, "false" = items only, absent = default (items only)
-		if isLocStr := params.Get("isLocation"); isLocStr != "" {
-			isLoc := queryBool(isLocStr)
-			v.IsLocation = &isLoc
-		}
-
-		v.FilterChildren = queryBool(params.Get("filterChildren"))
-
-		if strings.HasPrefix(v.Search, "#") {
-			aidStr := strings.TrimPrefix(v.Search, "#")
-
-			aid, ok := repo.ParseAssetID(aidStr)
-			if ok {
-				v.Search = ""
-				v.AssetID = aid
-			}
-		}
-
-		return v
-	}
 
 	return func(w http.ResponseWriter, r *http.Request) error {
-		query := extractQuery(r)
+		query := extractEntityQuery(r)
 		spanCtx, span := startEntityCtrlSpan(r.Context(), "controller.V1.HandleEntitiesGetAll",
 			attribute.String("query.search", query.Search),
 			attribute.Int("query.page", query.Page),

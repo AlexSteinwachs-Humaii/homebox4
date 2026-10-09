@@ -9,6 +9,7 @@
   import DataTable from "./table/data-table.vue";
   import { makeColumns } from "./table/columns";
   import { useI18n } from "vue-i18n";
+  import type { ItemsQuery } from "~/lib/api/classes/items";
   import type { Pagination } from "./pagination";
   import MaintenanceEditModal from "@/components/Maintenance/EditModal.vue";
   import ItemChangeDetails from "./ItemChangeDetails.vue";
@@ -19,6 +20,7 @@
     locationFlatTree?: FlatTreeItem[];
     pagination?: Pagination;
     disableSort?: boolean;
+    exportQuery?: ItemsQuery;
   }>();
 
   const emit = defineEmits<{
@@ -107,6 +109,7 @@
       :data="items"
       :location-flat-tree="locationFlatTree"
       :external-pagination="pagination"
+      :export-query="exportQuery"
       @refresh="$emit('refresh')"
     />
   </section>

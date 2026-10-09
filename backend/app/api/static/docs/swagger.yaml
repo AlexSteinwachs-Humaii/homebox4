@@ -3737,6 +3737,82 @@ paths:
       summary: Export Bill of Materials
       tags:
       - Reporting
+  /v1/reporting/filtered:
+    get:
+      description: Accepts the same query parameters as GET /v1/entities; page and
+        pageSize are ignored. Collection access is resolved by authenticated tenant
+        middleware.
+      parameters:
+      - description: 'JSON CSVPresentation: allowlisted visible columns with translated
+          labels, currency and short-date formatting captured from the table'
+        in: query
+        name: presentation
+        type: string
+      - description: 'Search string (including #asset ID)'
+        in: query
+        name: q
+        type: string
+      - description: 'Dashboard order: name, assetId, createdAt or updatedAt'
+        in: query
+        name: orderBy
+        type: string
+      - collectionFormat: multi
+        description: Tag IDs
+        in: query
+        items:
+          type: string
+        name: tags
+        type: array
+      - collectionFormat: multi
+        description: Parent IDs
+        in: query
+        items:
+          type: string
+        name: parentIds
+        type: array
+      - collectionFormat: multi
+        description: Custom field name=value pairs
+        in: query
+        items:
+          type: string
+        name: fields
+        type: array
+      - description: Exclude selected tags
+        in: query
+        name: negateTags
+        type: boolean
+      - description: Include archived entities
+        in: query
+        name: includeArchived
+        type: boolean
+      - description: Only entities without a primary photo
+        in: query
+        name: onlyWithoutPhoto
+        type: boolean
+      - description: Only entities with a primary photo
+        in: query
+        name: onlyWithPhoto
+        type: boolean
+      - description: Locations only when true; otherwise items
+        in: query
+        name: isLocation
+        type: boolean
+      - description: Only root entities
+        in: query
+        name: filterChildren
+        type: boolean
+      produces:
+      - text/csv
+      responses:
+        "200":
+          description: text/csv
+          schema:
+            type: string
+      security:
+      - Bearer: []
+      summary: Export all filtered reporting results
+      tags:
+      - Reporting
   /v1/status:
     get:
       produces:

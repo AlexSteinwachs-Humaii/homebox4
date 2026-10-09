@@ -593,6 +593,14 @@ func entityQuerySpanAttrs(gid uuid.UUID, q EntityQuery) []attribute.KeyValue {
 	}
 }
 
+// QueryAllByGroup uses the dashboard's filters and ordering without pagination.
+// Query values belong to this request; this does not promise a snapshot of concurrent writes.
+func (r *EntityRepository) QueryAllByGroup(ctx context.Context, gid uuid.UUID, q EntityQuery) ([]EntitySummary, error) {
+	q.Page, q.PageSize = -1, -1
+	result, err := r.QueryByGroup(ctx, gid, q)
+	return result.Items, err
+}
+
 // QueryByGroup returns a list of entities that belong to a specific group based on the provided query.
 func (r *EntityRepository) QueryByGroup(ctx context.Context, gid uuid.UUID, q EntityQuery) (PaginationResult[EntitySummary], error) {
 	ctx, span := entityTracer().Start(ctx, "repo.EntityRepository.QueryByGroup",
@@ -754,6 +762,9 @@ func (r *EntityRepository) QueryByGroup(ctx context.Context, gid uuid.UUID, q En
 	default: // "name"
 		qb = qb.Order(ent.Asc(entity.FieldName))
 	}
+
+	// Stable tie-breaker for equal values, shared by dashboard and export.
+	qb = qb.Order(ent.Asc(entity.FieldID))
 
 	qb = qb.
 		WithTag().

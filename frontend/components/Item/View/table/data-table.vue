@@ -1,5 +1,8 @@
 <script setup lang="ts" generic="TData, TValue">
+  import CSVExport from "./CSVExport.vue";
+  import type { ItemsQuery } from "~/lib/api/classes/items";
   import BaseCard from "@/components/Base/Card.vue";
+  import { defaultReportingColumns } from "~/lib/reporting-csv";
   import type { ColumnDef, SortingState, VisibilityState, ExpandedState } from "@tanstack/vue-table";
   import {
     getCoreRowModel,
@@ -31,6 +34,7 @@
     columns: ColumnDef<EntitySummary, TValue>[];
     data: EntitySummary[];
     disableControls?: boolean;
+    exportQuery?: ItemsQuery;
     view: "table" | "card";
     locationFlatTree?: FlatTreeItem[];
     externalPagination?: Pagination;
@@ -43,7 +47,7 @@
   const preferences = useViewPreferences();
   const defaultPageSize = preferences.value.itemsPerTablePage;
   const tableHeadersData = preferences.value.tableHeaders;
-  const defaultVisible = ["name", "quantity", "insured", "purchasePrice"];
+  const defaultVisible = defaultReportingColumns;
 
   const tableHeaders = computed(
     () =>
@@ -204,13 +208,17 @@
                   :model-value="table.getColumn(colId)?.getIsVisible()"
                   @update:model-value="toggleHeader(colId)"
                 />
-                <label class="text-sm" :for="colId"> {{ $t(`items.${camelToSnakeCase(colId)}`) }} </label>
+                <label class="text-sm" :for="colId">
+                  {{ $t(`items.${camelToSnakeCase(colId)}`) }}
+                </label>
               </div>
             </div>
           </div>
 
           <div class="flex flex-col gap-2">
-            <Label> {{ $t("components.item.view.table.rows_per_page") }} </Label>
+            <Label>
+              {{ $t("components.item.view.table.rows_per_page") }}
+            </Label>
             <Select :model-value="pagination.pageSize" @update:model-value="val => table.setPageSize(Number(val))">
               <SelectTrigger>
                 <SelectValue />
@@ -225,7 +233,9 @@
           </div>
 
           <div class="flex flex-col gap-2">
-            <Label class="text-sm"> {{ $t("components.item.view.table.quick_actions") }} </Label>
+            <Label class="text-sm">
+              {{ $t("components.item.view.table.quick_actions") }}
+            </Label>
             <Switch v-model="preferences.quickActions.enabled" />
           </div>
         </div>
@@ -238,7 +248,13 @@
           :pagination="pagination"
           :data-length="data.length"
           :external-pagination="externalPagination"
-        />
+        >
+          <CSVExport
+            v-if="exportQuery"
+            :query="exportQuery"
+            :columns="table.getVisibleLeafColumns().map(column => column.id)"
+          />
+        </DataTableControls>
       </div>
       <div>
         <TableView :table="table" :columns="columns" />
@@ -259,7 +275,13 @@
           :pagination="pagination"
           :data-length="data.length"
           :external-pagination="externalPagination"
-        />
+        >
+          <CSVExport
+            v-if="exportQuery"
+            :query="exportQuery"
+            :columns="table.getVisibleLeafColumns().map(column => column.id)"
+          />
+        </DataTableControls>
       </div>
       <CardView :table="table" :location-flat-tree="locationFlatTree" @refresh="$emit('refresh')" />
       <div v-if="!props.disableControls" class="pt-2">

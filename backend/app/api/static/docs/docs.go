@@ -2240,6 +2240,117 @@ const docTemplate = `{
                 }
             }
         },
+        "/v1/reporting/filtered": {
+            "get": {
+                "security": [
+                    {
+                        "Bearer": []
+                    }
+                ],
+                "description": "Accepts the same query parameters as GET /v1/entities; page and pageSize are ignored. Collection access is resolved by authenticated tenant middleware.",
+                "produces": [
+                    "text/csv"
+                ],
+                "tags": [
+                    "Reporting"
+                ],
+                "summary": "Export all filtered reporting results",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "JSON CSVPresentation: allowlisted visible columns with translated labels, currency and short-date formatting captured from the table",
+                        "name": "presentation",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "Search string (including #asset ID)",
+                        "name": "q",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "Dashboard order: name, assetId, createdAt or updatedAt",
+                        "name": "orderBy",
+                        "in": "query"
+                    },
+                    {
+                        "type": "array",
+                        "items": {
+                            "type": "string"
+                        },
+                        "collectionFormat": "multi",
+                        "description": "Tag IDs",
+                        "name": "tags",
+                        "in": "query"
+                    },
+                    {
+                        "type": "array",
+                        "items": {
+                            "type": "string"
+                        },
+                        "collectionFormat": "multi",
+                        "description": "Parent IDs",
+                        "name": "parentIds",
+                        "in": "query"
+                    },
+                    {
+                        "type": "array",
+                        "items": {
+                            "type": "string"
+                        },
+                        "collectionFormat": "multi",
+                        "description": "Custom field name=value pairs",
+                        "name": "fields",
+                        "in": "query"
+                    },
+                    {
+                        "type": "boolean",
+                        "description": "Exclude selected tags",
+                        "name": "negateTags",
+                        "in": "query"
+                    },
+                    {
+                        "type": "boolean",
+                        "description": "Include archived entities",
+                        "name": "includeArchived",
+                        "in": "query"
+                    },
+                    {
+                        "type": "boolean",
+                        "description": "Only entities without a primary photo",
+                        "name": "onlyWithoutPhoto",
+                        "in": "query"
+                    },
+                    {
+                        "type": "boolean",
+                        "description": "Only entities with a primary photo",
+                        "name": "onlyWithPhoto",
+                        "in": "query"
+                    },
+                    {
+                        "type": "boolean",
+                        "description": "Locations only when true; otherwise items",
+                        "name": "isLocation",
+                        "in": "query"
+                    },
+                    {
+                        "type": "boolean",
+                        "description": "Only root entities",
+                        "name": "filterChildren",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "text/csv",
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                }
+            }
+        },
         "/v1/status": {
             "get": {
                 "produces": [
