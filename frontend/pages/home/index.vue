@@ -29,7 +29,9 @@
   const recent = scopedResource(collectionId, () => loadRecentItems(useUserApi()));
   // Read directly instead of the legacy store getter, which collapses loading/failure into an empty array.
   const locations = scopedResource(collectionId, async () => {
-    const result = await useUserApi().items.getLocations({ filterChildren: true });
+    const result = await useUserApi().items.getLocations({
+      filterChildren: true,
+    });
     if (result.error) throw new Error("Unable to load locations");
     return result.data;
   });
@@ -40,16 +42,19 @@
         label: t("home.item_records"),
         value: data?.totalItems,
         note: t("home.not_units"),
+        to: "/items",
       },
       {
         label: t("home.recorded_value"),
         value: data ? fmtCurrency(data.totalItemPrice, data.currency, getLocaleCode()) : undefined,
         note: t("home.value_formula"),
+        to: "/items",
       },
       {
         label: t("home.total_locations"),
         value: data?.totalLocations,
         note: t("home.collection_places"),
+        to: "/locations",
       },
       { label: t("home.tags"), value: data?.totalTags, note: t("home.organize") },
     ];
@@ -89,7 +94,10 @@
     <section :aria-label="t('home.quick_statistics')" :aria-busy="statistics.pending.value">
       <div class="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
         <Panel v-for="stat in stats" :key="stat.label" class="space-y-3 p-5">
-          <h2 class="font-sans text-sm text-muted-foreground">{{ stat.label }}</h2>
+          <h2 class="font-sans text-sm text-muted-foreground">
+            <NuxtLink v-if="stat.to" :to="stat.to" class="habitat-link">{{ stat.label }}</NuxtLink>
+            <template v-else>{{ stat.label }}</template>
+          </h2>
           <p class="text-3xl font-bold tabular-nums">{{ stat.value ?? "—" }}</p>
           <p class="text-xs text-muted-foreground">{{ stat.note }}</p>
         </Panel>
