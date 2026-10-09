@@ -2416,6 +2416,134 @@
                 }
             }
         },
+        "/v1/reporting/filtered": {
+            "get": {
+                "security": [
+                    {
+                        "Bearer": []
+                    }
+                ],
+                "description": "Accepts the same query parameters as GET /v1/entities; page and pageSize are ignored. Collection access is resolved by authenticated tenant middleware.",
+                "tags": [
+                    "Reporting"
+                ],
+                "summary": "Export all filtered reporting results",
+                "parameters": [
+                    {
+                        "description": "Search string (including #asset ID)",
+                        "name": "q",
+                        "in": "query",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "description": "Dashboard order: name, assetId, createdAt or updatedAt",
+                        "name": "orderBy",
+                        "in": "query",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "description": "Tag IDs",
+                        "name": "tags",
+                        "in": "query",
+                        "explode": true,
+                        "schema": {
+                            "type": "array",
+                            "items": {
+                                "type": "string"
+                            }
+                        }
+                    },
+                    {
+                        "description": "Parent IDs",
+                        "name": "parentIds",
+                        "in": "query",
+                        "explode": true,
+                        "schema": {
+                            "type": "array",
+                            "items": {
+                                "type": "string"
+                            }
+                        }
+                    },
+                    {
+                        "description": "Custom field name=value pairs",
+                        "name": "fields",
+                        "in": "query",
+                        "explode": true,
+                        "schema": {
+                            "type": "array",
+                            "items": {
+                                "type": "string"
+                            }
+                        }
+                    },
+                    {
+                        "description": "Exclude selected tags",
+                        "name": "negateTags",
+                        "in": "query",
+                        "schema": {
+                            "type": "boolean"
+                        }
+                    },
+                    {
+                        "description": "Include archived entities",
+                        "name": "includeArchived",
+                        "in": "query",
+                        "schema": {
+                            "type": "boolean"
+                        }
+                    },
+                    {
+                        "description": "Only entities without a primary photo",
+                        "name": "onlyWithoutPhoto",
+                        "in": "query",
+                        "schema": {
+                            "type": "boolean"
+                        }
+                    },
+                    {
+                        "description": "Only entities with a primary photo",
+                        "name": "onlyWithPhoto",
+                        "in": "query",
+                        "schema": {
+                            "type": "boolean"
+                        }
+                    },
+                    {
+                        "description": "Locations only when true; otherwise items",
+                        "name": "isLocation",
+                        "in": "query",
+                        "schema": {
+                            "type": "boolean"
+                        }
+                    },
+                    {
+                        "description": "Only root entities",
+                        "name": "filterChildren",
+                        "in": "query",
+                        "schema": {
+                            "type": "boolean"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "text/csv",
+                        "content": {
+                            "text/csv": {
+                                "schema": {
+                                    "type": "string"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
         "/v1/status": {
             "get": {
                 "tags": [
