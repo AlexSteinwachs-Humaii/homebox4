@@ -1,5 +1,6 @@
 import type { ComputedRef } from "vue";
-import type { DaisyTheme } from "~~/lib/data/themes";
+import { themes as themeOptions, type DaisyTheme } from "~~/lib/data/themes";
+import { applyThemeToElement } from "~~/lib/data/apply-theme";
 
 export interface UseTheme {
   theme: ComputedRef<DaisyTheme>;
@@ -16,15 +17,7 @@ export function useTheme(): UseTheme {
       return;
     }
 
-    htmlEl.value.setAttribute("data-theme", newTheme);
-
-    const prefixedThemeClasses = Array.from(htmlEl.value.classList).filter(className => className.startsWith("theme-"));
-    if (prefixedThemeClasses.length > 0) {
-      htmlEl.value.classList.remove(...prefixedThemeClasses);
-    }
-
-    htmlEl.value.classList.remove(...themes);
-    htmlEl.value.classList.add("theme-" + newTheme);
+    applyThemeToElement(htmlEl.value, newTheme);
   };
 
   const setTheme = (newTheme: DaisyTheme) => {
@@ -51,34 +44,4 @@ export function useIsThemeInList(list: DaisyTheme[]) {
   });
 }
 
-export const themes = [
-  "dark",
-  "theme-aqua",
-  "theme-black",
-  "theme-bumblebee",
-  "theme-cmyk",
-  "theme-corporate",
-  "theme-cupcake",
-  "theme-cyberpunk",
-  "theme-dracula",
-  "theme-emerald",
-  "theme-fantasy",
-  "theme-forest",
-  "theme-garden",
-  "theme-halloween",
-  "theme-light",
-  "theme-lofi",
-  "theme-luxury",
-  "theme-pastel",
-  "theme-retro",
-  "theme-synthwave",
-  "theme-valentine",
-  "theme-wireframe",
-  "theme-autumn",
-  "theme-business",
-  "theme-acid",
-  "theme-lemonade",
-  "theme-night",
-  "theme-coffee",
-  "theme-winter",
-];
+export const themes = ["dark", ...themeOptions.map(option => "theme-" + option.value)];

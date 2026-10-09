@@ -36,6 +36,52 @@
     --radius: 0.5rem;
 }
 
+  /* Warm Habitat is opt-in; all existing theme definitions and defaults remain intact. */
+  .theme-warm-habitat {
+    color-scheme: dark;
+    --background: 0.000000 6.666667% 5.882353%;
+    --background-accent: 0.000000 5.882353% 10.000000%;
+    --foreground: 24.000000 48.387097% 93.921569%;
+    --primary: 0.000000 73.708920% 41.764706%;
+    --primary-foreground: 24.000000 48.387097% 93.921569%;
+    --secondary: 0.000000 12.941176% 16.666667%;
+    --secondary-foreground: 24.000000 48.387097% 93.921569%;
+    --accent: 0.000000 29.268293% 16.078431%;
+    --accent-foreground: 24.000000 48.387097% 93.921569%;
+    --muted: 0.000000 7.042254% 13.921569%;
+    --muted-foreground: 18.947368 12.925170% 71.176471%;
+    --card: 0.000000 5.882353% 10.000000%;
+    --card-foreground: 24.000000 48.387097% 93.921569%;
+    --popover: 0.000000 5.882353% 10.000000%;
+    --popover-foreground: 24.000000 48.387097% 93.921569%;
+    --destructive: 0.000000 93.548387% 81.764706%;
+    --destructive-foreground: 0.000000 6.666667% 5.882353%;
+    --input: 17.142857 8.366534% 49.215686%;
+    --border: 0.000000 8.800000% 24.509804%;
+    --ring: 6.600000 100.000000% 80.392157%;
+    --sidebar-background: 0.000000 0.000000% 3.137255%;
+    --sidebar-foreground: 24.000000 48.387097% 93.921569%;
+    --sidebar-primary: 0.000000 73.708920% 41.764706%;
+    --sidebar-primary-foreground: 24.000000 48.387097% 93.921569%;
+    --sidebar-accent: 0.000000 12.941176% 16.666667%;
+    --sidebar-accent-foreground: 24.000000 48.387097% 93.921569%;
+    --sidebar-border: 0.000000 8.800000% 24.509804%;
+    --sidebar-ring: 6.600000 100.000000% 80.392157%;
+    --link: 6.600000 100.000000% 80.392157%;
+    --radius: 1rem;
+    --font-editorial: Georgia, 'Times New Roman', serif;
+    font-family: ui-sans-serif, system-ui, sans-serif;
+  }
+
+  .theme-warm-habitat :where(h1, h2, h3) {
+    font-family: var(--font-editorial);
+    font-weight: 400;
+  }
+
+  .theme-warm-habitat :where(a) {
+    color: hsl(var(--link));
+  }
+
   /*
   * The below themes are based on the daisyUI themes which are licensed under the MIT License.
   * Copyright (c) 2020 Pouya Saadeghi
@@ -1076,4 +1122,45 @@ h6 {
   overflow-wrap: anywhere;
   word-break: normal;
   hyphens: auto;
+}
+
+/* Shared patterns work in every theme; new screens must not copy palette values. */
+@layer components {
+  .habitat-panel {
+    @apply rounded-lg border border-border bg-card text-card-foreground shadow-none;
+  }
+  .habitat-heading {
+    font-family: var(--font-editorial, inherit);
+    @apply text-2xl leading-tight;
+  }
+  .habitat-context {
+    @apply flex flex-wrap items-start justify-between gap-4;
+  }
+  .habitat-table {
+    @apply font-sans;
+  }
+  .habitat-table :where(th) {
+    @apply bg-muted text-muted-foreground;
+  }
+  .habitat-table :where(td, th) {
+    @apply border-border;
+  }
+  .habitat-form-group {
+    @apply min-w-0 space-y-4 p-6;
+  }
+  .habitat-feedback {
+    @apply flex items-start gap-3 p-4;
+  }
+  .habitat-link {
+    @apply text-link underline underline-offset-4;
+  }
+  .habitat-link:focus-visible {
+    @apply rounded-sm outline-none ring-2 ring-ring ring-offset-2 ring-offset-background;
+  }
+}
+
+/* Existing link consumers used primary before link became a semantic token.
+   Keep action/button fills crimson without making their anchor text pale red. */
+.theme-warm-habitat a.text-primary {
+  color: hsl(var(--link));
 }
