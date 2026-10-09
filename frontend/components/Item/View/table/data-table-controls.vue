@@ -40,7 +40,8 @@
 
 <template>
   <div class="flex flex-col gap-2 md:flex-row md:items-center md:justify-between md:gap-0">
-    <div class="order-2 flex items-center gap-2 md:order-1">
+    <div class="order-2 flex flex-wrap items-center gap-2 md:order-1">
+      <slot />
       <Button class="size-10 p-0" variant="outline" @click="openDialog(DialogID.ItemTableSettings)">
         <MdiTableCog />
       </Button>

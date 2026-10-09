@@ -902,6 +902,12 @@
             "toast": {
                 "page_too_small_card": "Page size is too small for the card size"
             }
+        },
+        "csv_export": {
+            "action": "Export CSV",
+            "exporting": "Exporting…",
+            "scope": "All filtered results, not just this page",
+            "error": "Unable to export CSV. Please try again."
         }
     },
     "scanner": {

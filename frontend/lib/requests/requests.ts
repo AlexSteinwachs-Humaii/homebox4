@@ -20,6 +20,7 @@ export type RequestArgs<T> = {
   body?: T;
   data?: FormData;
   headers?: Record<string, string>;
+  signal?: AbortSignal;
 };
 
 export class Requests {
@@ -73,6 +74,7 @@ export class Requests {
   private async do<T>(method: Method, rargs: RequestArgs<unknown>): Promise<TResponse<T>> {
     const payload: RequestInit = {
       method,
+      signal: rargs.signal,
       headers: {
         ...rargs.headers,
         ...this.headers,
