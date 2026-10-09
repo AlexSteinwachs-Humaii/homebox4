@@ -14,6 +14,7 @@ import (
 	"github.com/sysadminsmedia/homebox/backend/internal/data/ent/entityoffboarding"
 	"github.com/sysadminsmedia/homebox/backend/internal/data/ent/entitytype"
 	"github.com/sysadminsmedia/homebox/backend/internal/data/ent/group"
+	"github.com/sysadminsmedia/homebox/backend/internal/data/types"
 )
 
 var ErrInvalidLifecycleTransition = errors.New("invalid asset lifecycle transition")
@@ -116,4 +117,38 @@ func (r *EntityRepository) OffboardingHistoryByGroup(ctx context.Context, gid, i
 		return nil, err
 	}
 	return r.db.EntityOffboarding.Query().Where(entityoffboarding.EntityID(id), entityoffboarding.HasEntityWith(entity.HasGroupWith(group.ID(gid)))).Order(ent.Asc(entityoffboarding.FieldCreatedAt), ent.Asc(entityoffboarding.FieldID)).All(ctx)
+}
+
+// EntityOffboardingRecord is the public representation; no Ent edges or internal
+// ownership fields are exposed. Records are ordered by recorded time, then ID.
+type EntityOffboardingRecord struct {
+	ID            uuid.UUID  `json:"id"`
+	Outcome       string     `json:"outcome"`
+	EffectiveDate types.Date `json:"effectiveDate" swaggertype:"string"`
+	CustomReason  string     `json:"customReason"`
+	Notes         string     `json:"notes"`
+	CreatedAt     time.Time  `json:"createdAt"`
+	ReactivatedAt *time.Time `json:"reactivatedAt" extensions:"x-nullable"`
+}
+
+func MapOffboardingRecord(r *ent.EntityOffboarding) EntityOffboardingRecord {
+	return EntityOffboardingRecord{ID: r.ID, Outcome: string(r.Outcome), EffectiveDate: types.DateFromDBTime(r.EffectiveDate), CustomReason: r.CustomReason, Notes: r.Notes, CreatedAt: r.CreatedAt, ReactivatedAt: r.ReactivatedAt}
+}
+
+func mapOffboardingHistory(records []*ent.EntityOffboarding) []EntityOffboardingRecord {
+	out := make([]EntityOffboardingRecord, 0, len(records))
+	for _, r := range records {
+		out = append(out, MapOffboardingRecord(r))
+	}
+	return out
+}
+
+var ErrInvalidLifecycleFilter = errors.New("lifecycle must be active, all, or offboarded")
+
+func ValidateLifecycleFilter(filter string) error {
+	switch filter {
+	case "", "active", "all", "offboarded":
+		return nil
+	}
+	return ErrInvalidLifecycleFilter
 }

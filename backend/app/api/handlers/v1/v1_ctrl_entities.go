@@ -48,6 +48,7 @@ func startEntityCtrlSpan(ctx context.Context, name string, attrs ...attribute.Ke
 //	@Summary	Query All Entities
 //	@Tags		Entities
 //	@Produce	json
+//	@Param lifecycle query string false "Lifecycle filter; archive filtering remains independent" Enums(active, all, offboarded) default(active)
 //	@Param		q			query		string		false	"search string"
 //	@Param		page		query		int			false	"page number"
 //	@Param		pageSize	query		int			false	"items per page"
@@ -83,6 +84,7 @@ func (ctrl *V1Controller) HandleEntitiesGetAll() errchain.HandlerFunc {
 			OnlyWithoutPhoto: queryBool(params.Get("onlyWithoutPhoto")),
 			OnlyWithPhoto:    queryBool(params.Get("onlyWithPhoto")),
 			IncludeArchived:  queryBool(params.Get("includeArchived")),
+			Lifecycle:        params.Get("lifecycle"),
 			Fields:           filterFieldItems(params["fields"]),
 			OrderBy:          params.Get("orderBy"),
 		}
@@ -110,6 +112,9 @@ func (ctrl *V1Controller) HandleEntitiesGetAll() errchain.HandlerFunc {
 
 	return func(w http.ResponseWriter, r *http.Request) error {
 		query := extractQuery(r)
+		if err := repo.ValidateLifecycleFilter(query.Lifecycle); err != nil {
+			return validate.NewRequestError(err, http.StatusBadRequest)
+		}
 		spanCtx, span := startEntityCtrlSpan(r.Context(), "controller.V1.HandleEntitiesGetAll",
 			attribute.String("query.search", query.Search),
 			attribute.Int("query.page", query.Page),

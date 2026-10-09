@@ -131,6 +131,7 @@ func (r *GroupRepository) StatsLocationsByPurchasePrice(ctx context.Context, gid
 		FROM entities parent
 		JOIN entity_types et ON et.id = parent.entity_type_entities
 		LEFT JOIN entities child ON child.entity_children = parent.id
+			AND child.offboarded = false AND child.archived = false AND child.group_entities = $1
 			AND child.entity_type_entities IN (SELECT id FROM entity_types WHERE is_location = false)
 		WHERE parent.group_entities = $1 AND et.is_location = true
 		GROUP BY parent.id, parent.name
@@ -169,6 +170,7 @@ func (r *GroupRepository) StatsTagsByPurchasePrice(ctx context.Context, gid uuid
 
 			sq.Join(jt).On(sq.C(tag.FieldID), jt.C(tag.EntitiesPrimaryKey[0]))
 			sq.Join(entityTable).On(jt.C(tag.EntitiesPrimaryKey[1]), entityTable.C(entity.FieldID))
+			sq.Where(sql.And(sql.EQ(entityTable.C(entity.FieldOffboarded), false), sql.EQ(entityTable.C(entity.FieldArchived), false), sql.EQ(entityTable.C(entity.GroupColumn), gid)))
 
 			return sql.As(sql.Sum(entityTable.C(entity.FieldPurchasePrice)), "total")
 		}).
@@ -188,7 +190,7 @@ func (r *GroupRepository) StatsPurchasePrice(ctx context.Context, gid uuid.UUID,
 		SUM(CASE WHEN e.created_at < $2 THEN e.purchase_price ELSE 0 END) AS price_at_end
 	FROM entities e
 	JOIN entity_types et ON et.id = e.entity_type_entities
-	WHERE e.group_entities = $3 AND e.archived = false AND et.is_location = false
+	WHERE e.group_entities = $3 AND e.archived = false AND e.offboarded = false AND et.is_location = false
 `
 	stats := ValueOverTime{
 		Start: start,
@@ -222,6 +224,7 @@ func (r *GroupRepository) StatsPurchasePrice(ctx context.Context, gid uuid.UUID,
 			entity.CreatedAtGTE(start),
 			entity.CreatedAtLTE(end),
 			entity.Archived(false),
+			entity.Offboarded(false),
 			entity.HasEntityTypeWith(entitytype.IsLocation(false)),
 		).
 		Select(
@@ -249,15 +252,15 @@ func (r *GroupRepository) StatsGroup(ctx context.Context, gid uuid.UUID) (GroupS
 	q := `
 		SELECT
             (SELECT COUNT(*) FROM user_groups WHERE group_id = $2) AS total_users,
-            (SELECT COUNT(*) FROM entities e JOIN entity_types et ON et.id = e.entity_type_entities WHERE e.group_entities = $2 AND e.archived = false AND et.is_location = false) AS total_items,
+            (SELECT COUNT(*) FROM entities e JOIN entity_types et ON et.id = e.entity_type_entities WHERE e.group_entities = $2 AND e.archived = false AND e.offboarded = false AND et.is_location = false) AS total_items,
             (SELECT COUNT(*) FROM entities e JOIN entity_types et ON et.id = e.entity_type_entities WHERE e.group_entities = $2 AND et.is_location = true) AS total_locations,
             (SELECT COUNT(*) FROM tags WHERE group_tags = $2) AS total_tags,
-            (SELECT SUM(e.purchase_price*e.quantity) FROM entities e JOIN entity_types et ON et.id = e.entity_type_entities WHERE e.group_entities = $2 AND e.archived = false AND et.is_location = false) AS total_item_price,
+            (SELECT SUM(e.purchase_price*e.quantity) FROM entities e JOIN entity_types et ON et.id = e.entity_type_entities WHERE e.group_entities = $2 AND e.archived = false AND e.offboarded = false AND et.is_location = false) AS total_item_price,
             (SELECT COUNT(*)
                 FROM entities e
                 JOIN entity_types et ON et.id = e.entity_type_entities
                     WHERE e.group_entities = $2
-                    AND e.archived = false
+                    AND e.archived = false AND e.offboarded = false
                     AND et.is_location = false
                     AND (e.lifetime_warranty = true OR e.warranty_expires > $1)
                 ) AS total_with_warranty;

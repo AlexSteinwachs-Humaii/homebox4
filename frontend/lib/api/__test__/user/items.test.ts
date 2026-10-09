@@ -275,3 +275,124 @@ describe("user should be able to create an item and add an attachment", () => {
     childsCleanup();
   });
 });
+
+describe("asset lifecycle API", () => {
+  test("offboarding discovery, retained history, counts and archive independence", async () => {
+    const api = await sharedUserClient();
+    const name = `lifecycle-${faker.string.uuid()}`;
+    const types = (await api.entityTypes.getAll()).data;
+    const location = (
+      await api.items.createLocation({
+        name: `${name}-room`,
+        description: "",
+        parentId: null,
+        quantity: 1,
+        tagIds: [],
+        entityTypeId: types.find(t => t.isLocation)!.id,
+      })
+    ).data;
+    const item = (
+      await api.items.create({
+        name,
+        description: "",
+        parentId: location.id,
+        quantity: 3,
+        tagIds: [],
+        entityTypeId: types.find(t => !t.isLocation)!.id,
+      })
+    ).data;
+    const input = {
+      outcome: "donated" as const,
+      effectiveDate: "2026-10-09",
+      customReason: "",
+      notes: "retained notes",
+    };
+    try {
+      const before = (await api.stats.group()).data;
+      expect((await api.items.offboardingHistory(item.id)).data).toEqual([]);
+      expect(
+        (
+          await api.items.offboard(item.id, {
+            ...input,
+            outcome: "custom",
+            customReason: " ",
+          })
+        ).response.status
+      ).toBe(400);
+      expect(
+        (
+          await api.items.offboard(item.id, {
+            ...input,
+            effectiveDate: "2026-02-30",
+          })
+        ).response.status
+      ).toBe(400);
+      expect((await api.items.get(item.id)).data.offboarded).toBe(false);
+      expect((await api.items.offboard(location.id, input)).response.status).toBe(400);
+      expect((await api.items.reactivate(location.id)).response.status).toBe(400);
+      const first = await api.items.offboard(item.id, input);
+      expect(first.response.status).toBe(201);
+      expect(first.data.effectiveDate).toBe(input.effectiveDate);
+      expect((await api.items.offboard(item.id, input)).response.status).toBe(409);
+      expect((await api.items.getAll({ q: name })).data.total).toBe(0);
+      expect((await api.items.getAll({ q: name, orderBy: "createdAt", pageSize: 5 })).data.items).toEqual([]);
+      expect((await api.items.getAll({ q: name, lifecycle: "all" })).data.total).toBe(1);
+      expect(
+        (
+          await api.items.getAll({
+            q: name,
+            lifecycle: "offboarded",
+            page: 1,
+            pageSize: 1,
+          })
+        ).data.items[0]!.offboarded
+      ).toBe(true);
+      const after = (await api.stats.group()).data;
+      expect(after.totalItems).toBe(before.totalItems - 1);
+      expect(after.totalLocations).toBe(before.totalLocations);
+      expect((await api.items.getLocations()).data.find(l => l.id === location.id)?.itemCount ?? 0).toBe(0);
+      const detail = (await api.items.get(item.id)).data;
+      expect(detail.offboardingHistory).toHaveLength(1);
+      expect(detail.offboardingHistory[0]!.notes).toBe(input.notes);
+      expect((await api.items.reactivate(item.id)).response.status).toBe(204);
+      expect((await api.items.reactivate(item.id)).response.status).toBe(409);
+      expect((await api.items.getAll({ q: name })).data.total).toBe(1);
+      expect((await api.items.getLocations()).data.find(l => l.id === location.id)?.itemCount).toBe(3);
+      const returned = (await api.items.get(item.id)).data;
+      expect(
+        (
+          await api.items.update(item.id, {
+            ...returned,
+            archived: true,
+            parentId: location.id,
+            entityTypeId: returned.entityType!.id,
+            tagIds: returned.tags.map(t => t.id),
+          })
+        ).response.status
+      ).toBe(200);
+      const second = await api.items.offboard(item.id, input);
+      expect(second.response.status).toBe(201);
+      expect(second.data.id).not.toBe(first.data.id);
+      expect((await api.items.reactivate(item.id)).response.status).toBe(204);
+      expect((await api.items.getAll({ q: name })).data.total).toBe(0);
+      expect((await api.items.getAll({ q: name, includeArchived: true })).data.total).toBe(1);
+      const history = (await api.items.offboardingHistory(item.id)).data;
+      expect(history.map(r => r.id)).toEqual([first.data.id, second.data.id]);
+      expect(history.every(r => r.reactivatedAt !== null)).toBe(true);
+      expect((await api.items.get(item.id)).data.archived).toBe(true);
+
+      const otherUser = factories.user();
+      const publicApi = factories.client.public();
+      expect((await publicApi.register(otherUser)).response.status).toBe(204);
+      const login = await publicApi.login(otherUser.email, otherUser.password);
+      const other = factories.client.user(login.data.token);
+      expect((await other.items.offboardingHistory(item.id)).response.status).toBe(404);
+      expect((await other.items.offboard(item.id, input)).response.status).toBe(404);
+      expect((await other.items.reactivate(item.id)).response.status).toBe(404);
+      expect((await api.items.offboardingHistory(item.id)).data).toEqual(history);
+    } finally {
+      await api.items.delete(item.id);
+      await api.items.deleteLocation(location.id);
+    }
+  });
+});

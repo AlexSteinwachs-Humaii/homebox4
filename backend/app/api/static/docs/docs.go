@@ -246,6 +246,18 @@ const docTemplate = `{
                 "summary": "Query All Entities",
                 "parameters": [
                     {
+                        "enum": [
+                            "active",
+                            "all",
+                            "offboarded"
+                        ],
+                        "type": "string",
+                        "default": "active",
+                        "description": "Lifecycle filter; archive filtering remains independent",
+                        "name": "lifecycle",
+                        "in": "query"
+                    },
+                    {
                         "type": "string",
                         "description": "search string",
                         "name": "q",
@@ -989,6 +1001,123 @@ const docTemplate = `{
                 }
             }
         },
+        "/v1/entities/{id}/offboard": {
+            "post": {
+                "security": [
+                    {
+                        "Bearer": []
+                    }
+                ],
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Entities"
+                ],
+                "summary": "Offboard an active asset",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Entity ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "description": "Offboarding record",
+                        "name": "payload",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/v1.EntityOffboardRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "201": {
+                        "description": "Created",
+                        "schema": {
+                            "$ref": "#/definitions/repo.EntityOffboardingRecord"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    },
+                    "409": {
+                        "description": "Conflict",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/v1/entities/{id}/offboarding-history": {
+            "get": {
+                "security": [
+                    {
+                        "Bearer": []
+                    }
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Entities"
+                ],
+                "summary": "Get retained asset offboarding history, oldest recorded first",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Entity ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "array",
+                            "items": {
+                                "$ref": "#/definitions/repo.EntityOffboardingRecord"
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    }
+                }
+            }
+        },
         "/v1/entities/{id}/path": {
             "get": {
                 "security": [
@@ -1019,6 +1148,60 @@ const docTemplate = `{
                             "type": "array",
                             "items": {
                                 "$ref": "#/definitions/repo.EntityPath"
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/v1/entities/{id}/reactivate": {
+            "post": {
+                "security": [
+                    {
+                        "Bearer": []
+                    }
+                ],
+                "tags": [
+                    "Entities"
+                ],
+                "summary": "Reactivate an offboarded asset without changing archive state",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Entity ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "204": {
+                        "description": "No Content"
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    },
+                    "409": {
+                        "description": "Conflict",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
                             }
                         }
                     }
@@ -3531,6 +3714,10 @@ const docTemplate = `{
                     "description": "Notes holds the value of the \"notes\" field.",
                     "type": "string"
                 },
+                "offboarded": {
+                    "description": "Offboarded holds the value of the \"offboarded\" field.",
+                    "type": "boolean"
+                },
                 "purchase_date": {
                     "description": "PurchaseDate holds the value of the \"purchase_date\" field.",
                     "type": "string"
@@ -3632,6 +3819,13 @@ const docTemplate = `{
                         "$ref": "#/definitions/ent.MaintenanceEntry"
                     }
                 },
+                "offboarding_records": {
+                    "description": "OffboardingRecords holds the value of the offboarding_records edge.",
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/ent.EntityOffboarding"
+                    }
+                },
                 "parent": {
                     "description": "Parent holds the value of the parent edge.",
                     "allOf": [
@@ -3707,6 +3901,72 @@ const docTemplate = `{
             }
         },
         "ent.EntityFieldEdges": {
+            "type": "object",
+            "properties": {
+                "entity": {
+                    "description": "Entity holds the value of the entity edge.",
+                    "allOf": [
+                        {
+                            "$ref": "#/definitions/ent.Entity"
+                        }
+                    ]
+                }
+            }
+        },
+        "ent.EntityOffboarding": {
+            "type": "object",
+            "properties": {
+                "created_at": {
+                    "description": "CreatedAt holds the value of the \"created_at\" field.",
+                    "type": "string"
+                },
+                "custom_reason": {
+                    "description": "CustomReason holds the value of the \"custom_reason\" field.",
+                    "type": "string"
+                },
+                "edges": {
+                    "description": "Edges holds the relations/edges for other nodes in the graph.\nThe values are being populated by the EntityOffboardingQuery when eager-loading is set.",
+                    "allOf": [
+                        {
+                            "$ref": "#/definitions/ent.EntityOffboardingEdges"
+                        }
+                    ]
+                },
+                "effective_date": {
+                    "description": "EffectiveDate holds the value of the \"effective_date\" field.",
+                    "type": "string"
+                },
+                "entity_id": {
+                    "description": "EntityID holds the value of the \"entity_id\" field.",
+                    "type": "string"
+                },
+                "id": {
+                    "description": "ID of the ent.",
+                    "type": "string"
+                },
+                "notes": {
+                    "description": "Notes holds the value of the \"notes\" field.",
+                    "type": "string"
+                },
+                "outcome": {
+                    "description": "Outcome holds the value of the \"outcome\" field.",
+                    "allOf": [
+                        {
+                            "$ref": "#/definitions/entityoffboarding.Outcome"
+                        }
+                    ]
+                },
+                "reactivated_at": {
+                    "description": "ReactivatedAt holds the value of the \"reactivated_at\" field.",
+                    "type": "string"
+                },
+                "updated_at": {
+                    "description": "UpdatedAt holds the value of the \"updated_at\" field.",
+                    "type": "string"
+                }
+            }
+        },
+        "ent.EntityOffboardingEdges": {
             "type": "object",
             "properties": {
                 "entity": {
@@ -4633,6 +4893,25 @@ const docTemplate = `{
                 "TypeTime"
             ]
         },
+        "entityoffboarding.Outcome": {
+            "type": "string",
+            "enum": [
+                "sold",
+                "donated",
+                "disposed",
+                "recycled",
+                "lost",
+                "custom"
+            ],
+            "x-enum-varnames": [
+                "OutcomeSold",
+                "OutcomeDonated",
+                "OutcomeDisposed",
+                "OutcomeRecycled",
+                "OutcomeLost",
+                "OutcomeCustom"
+            ]
+        },
         "export.Kind": {
             "type": "string",
             "enum": [
@@ -4874,6 +5153,33 @@ const docTemplate = `{
                 }
             }
         },
+        "repo.EntityOffboardingRecord": {
+            "type": "object",
+            "properties": {
+                "createdAt": {
+                    "type": "string"
+                },
+                "customReason": {
+                    "type": "string"
+                },
+                "effectiveDate": {
+                    "type": "string"
+                },
+                "id": {
+                    "type": "string"
+                },
+                "notes": {
+                    "type": "string"
+                },
+                "outcome": {
+                    "type": "string"
+                },
+                "reactivatedAt": {
+                    "type": "string",
+                    "x-nullable": true
+                }
+            }
+        },
         "repo.EntityOut": {
             "type": "object",
             "properties": {
@@ -4959,6 +5265,15 @@ const docTemplate = `{
                 "notes": {
                     "description": "Extras",
                     "type": "string"
+                },
+                "offboarded": {
+                    "type": "boolean"
+                },
+                "offboardingHistory": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/repo.EntityOffboardingRecord"
+                    }
                 },
                 "parent": {
                     "description": "Edges",
@@ -5125,6 +5440,9 @@ const docTemplate = `{
                 },
                 "name": {
                     "type": "string"
+                },
+                "offboarded": {
+                    "type": "boolean"
                 },
                 "parent": {
                     "description": "Edges",
@@ -6415,6 +6733,32 @@ const docTemplate = `{
             "properties": {
                 "name": {
                     "type": "string"
+                }
+            }
+        },
+        "v1.EntityOffboardRequest": {
+            "type": "object",
+            "properties": {
+                "customReason": {
+                    "type": "string"
+                },
+                "effectiveDate": {
+                    "type": "string",
+                    "example": "2026-10-09"
+                },
+                "notes": {
+                    "type": "string"
+                },
+                "outcome": {
+                    "type": "string",
+                    "enum": [
+                        "sold",
+                        "donated",
+                        "disposed",
+                        "recycled",
+                        "lost",
+                        "custom"
+                    ]
                 }
             }
         },
