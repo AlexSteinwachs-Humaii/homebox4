@@ -26,6 +26,12 @@ import (
 // the same upgrade, rollback and concurrency assertions on that dialect.
 func lifecycleDatabase(t *testing.T, dialect string) (*EntityRepository, *ent.Client, uuid.UUID, uuid.UUID) {
 	t.Helper()
+	return lifecycleDatabaseWithLegacyFixture(t, dialect, nil)
+}
+
+// seed runs before the upgrade and returns assertions to run afterward.
+func lifecycleDatabaseWithLegacyFixture(t *testing.T, dialect string, seed func(*ent.Client, uuid.UUID) func()) (*EntityRepository, *ent.Client, uuid.UUID, uuid.UUID) {
+	t.Helper()
 	ctx := context.Background()
 	driver, dsn := "sqlite3", "file:"+uuid.NewString()+"?mode=memory&cache=shared&_fk=1&_time_format=sqlite&_pragma=busy_timeout=5000"
 	if dialect == "postgres" {
@@ -58,6 +64,10 @@ func lifecycleDatabase(t *testing.T, dialect string) (*EntityRepository, *ent.Cl
 	require.NoError(t, err)
 	e, err := client.Entity.Create().SetName("legacy").SetGroupID(g.ID).SetEntityTypeID(et.ID).SetArchived(true).SetSoldTo("legacy buyer").SetSoldPrice(42).Save(ctx)
 	require.NoError(t, err)
+	var verify func()
+	if seed != nil {
+		verify = seed(client, e.ID)
+	}
 
 	// Turn the freshly generated schema into the previous entity schema, then
 	// execute the embedded upgrade over real populated legacy data.
@@ -95,6 +105,9 @@ func lifecycleDatabase(t *testing.T, dialect string) (*EntityRepository, *ent.Cl
 	count, err := client.EntityOffboarding.Query().Count(ctx)
 	require.NoError(t, err)
 	require.Zero(t, count)
+	if verify != nil {
+		verify()
+	}
 	return r, client, g.ID, e.ID
 }
 
