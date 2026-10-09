@@ -81,6 +81,18 @@ func (f EntityFieldFunc) Mutate(ctx context.Context, m ent.Mutation) (ent.Value,
 	return nil, fmt.Errorf("unexpected mutation type %T. expect *ent.EntityFieldMutation", m)
 }
 
+// The EntityOffboardingFunc type is an adapter to allow the use of ordinary
+// function as EntityOffboarding mutator.
+type EntityOffboardingFunc func(context.Context, *ent.EntityOffboardingMutation) (ent.Value, error)
+
+// Mutate calls f(ctx, m).
+func (f EntityOffboardingFunc) Mutate(ctx context.Context, m ent.Mutation) (ent.Value, error) {
+	if mv, ok := m.(*ent.EntityOffboardingMutation); ok {
+		return f(ctx, mv)
+	}
+	return nil, fmt.Errorf("unexpected mutation type %T. expect *ent.EntityOffboardingMutation", m)
+}
+
 // The EntityTemplateFunc type is an adapter to allow the use of ordinary
 // function as EntityTemplate mutator.
 type EntityTemplateFunc func(context.Context, *ent.EntityTemplateMutation) (ent.Value, error)

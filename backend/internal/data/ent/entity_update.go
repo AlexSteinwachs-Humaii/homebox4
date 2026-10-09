@@ -15,6 +15,7 @@ import (
 	"github.com/sysadminsmedia/homebox/backend/internal/data/ent/attachment"
 	"github.com/sysadminsmedia/homebox/backend/internal/data/ent/entity"
 	"github.com/sysadminsmedia/homebox/backend/internal/data/ent/entityfield"
+	"github.com/sysadminsmedia/homebox/backend/internal/data/ent/entityoffboarding"
 	"github.com/sysadminsmedia/homebox/backend/internal/data/ent/entitytype"
 	"github.com/sysadminsmedia/homebox/backend/internal/data/ent/group"
 	"github.com/sysadminsmedia/homebox/backend/internal/data/ent/maintenanceentry"
@@ -160,6 +161,20 @@ func (_u *EntityUpdate) SetArchived(v bool) *EntityUpdate {
 func (_u *EntityUpdate) SetNillableArchived(v *bool) *EntityUpdate {
 	if v != nil {
 		_u.SetArchived(*v)
+	}
+	return _u
+}
+
+// SetOffboarded sets the "offboarded" field.
+func (_u *EntityUpdate) SetOffboarded(v bool) *EntityUpdate {
+	_u.mutation.SetOffboarded(v)
+	return _u
+}
+
+// SetNillableOffboarded sets the "offboarded" field if the given value is not nil.
+func (_u *EntityUpdate) SetNillableOffboarded(v *bool) *EntityUpdate {
+	if v != nil {
+		_u.SetOffboarded(*v)
 	}
 	return _u
 }
@@ -541,6 +556,21 @@ func (_u *EntityUpdate) AddFields(v ...*EntityField) *EntityUpdate {
 	return _u.AddFieldIDs(ids...)
 }
 
+// AddOffboardingRecordIDs adds the "offboarding_records" edge to the EntityOffboarding entity by IDs.
+func (_u *EntityUpdate) AddOffboardingRecordIDs(ids ...uuid.UUID) *EntityUpdate {
+	_u.mutation.AddOffboardingRecordIDs(ids...)
+	return _u
+}
+
+// AddOffboardingRecords adds the "offboarding_records" edges to the EntityOffboarding entity.
+func (_u *EntityUpdate) AddOffboardingRecords(v ...*EntityOffboarding) *EntityUpdate {
+	ids := make([]uuid.UUID, len(v))
+	for i := range v {
+		ids[i] = v[i].ID
+	}
+	return _u.AddOffboardingRecordIDs(ids...)
+}
+
 // AddMaintenanceEntryIDs adds the "maintenance_entries" edge to the MaintenanceEntry entity by IDs.
 func (_u *EntityUpdate) AddMaintenanceEntryIDs(ids ...uuid.UUID) *EntityUpdate {
 	_u.mutation.AddMaintenanceEntryIDs(ids...)
@@ -655,6 +685,27 @@ func (_u *EntityUpdate) RemoveFields(v ...*EntityField) *EntityUpdate {
 		ids[i] = v[i].ID
 	}
 	return _u.RemoveFieldIDs(ids...)
+}
+
+// ClearOffboardingRecords clears all "offboarding_records" edges to the EntityOffboarding entity.
+func (_u *EntityUpdate) ClearOffboardingRecords() *EntityUpdate {
+	_u.mutation.ClearOffboardingRecords()
+	return _u
+}
+
+// RemoveOffboardingRecordIDs removes the "offboarding_records" edge to EntityOffboarding entities by IDs.
+func (_u *EntityUpdate) RemoveOffboardingRecordIDs(ids ...uuid.UUID) *EntityUpdate {
+	_u.mutation.RemoveOffboardingRecordIDs(ids...)
+	return _u
+}
+
+// RemoveOffboardingRecords removes "offboarding_records" edges to EntityOffboarding entities.
+func (_u *EntityUpdate) RemoveOffboardingRecords(v ...*EntityOffboarding) *EntityUpdate {
+	ids := make([]uuid.UUID, len(v))
+	for i := range v {
+		ids[i] = v[i].ID
+	}
+	return _u.RemoveOffboardingRecordIDs(ids...)
 }
 
 // ClearMaintenanceEntries clears all "maintenance_entries" edges to the MaintenanceEntry entity.
@@ -838,6 +889,9 @@ func (_u *EntityUpdate) sqlSave(ctx context.Context) (_node int, err error) {
 	}
 	if value, ok := _u.mutation.Archived(); ok {
 		_spec.SetField(entity.FieldArchived, field.TypeBool, value)
+	}
+	if value, ok := _u.mutation.Offboarded(); ok {
+		_spec.SetField(entity.FieldOffboarded, field.TypeBool, value)
 	}
 	if value, ok := _u.mutation.AssetID(); ok {
 		_spec.SetField(entity.FieldAssetID, field.TypeInt64, value)
@@ -1145,6 +1199,51 @@ func (_u *EntityUpdate) sqlSave(ctx context.Context) (_node int, err error) {
 		}
 		_spec.Edges.Add = append(_spec.Edges.Add, edge)
 	}
+	if _u.mutation.OffboardingRecordsCleared() {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.O2M,
+			Inverse: false,
+			Table:   entity.OffboardingRecordsTable,
+			Columns: []string{entity.OffboardingRecordsColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(entityoffboarding.FieldID, field.TypeUUID),
+			},
+		}
+		_spec.Edges.Clear = append(_spec.Edges.Clear, edge)
+	}
+	if nodes := _u.mutation.RemovedOffboardingRecordsIDs(); len(nodes) > 0 && !_u.mutation.OffboardingRecordsCleared() {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.O2M,
+			Inverse: false,
+			Table:   entity.OffboardingRecordsTable,
+			Columns: []string{entity.OffboardingRecordsColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(entityoffboarding.FieldID, field.TypeUUID),
+			},
+		}
+		for _, k := range nodes {
+			edge.Target.Nodes = append(edge.Target.Nodes, k)
+		}
+		_spec.Edges.Clear = append(_spec.Edges.Clear, edge)
+	}
+	if nodes := _u.mutation.OffboardingRecordsIDs(); len(nodes) > 0 {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.O2M,
+			Inverse: false,
+			Table:   entity.OffboardingRecordsTable,
+			Columns: []string{entity.OffboardingRecordsColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(entityoffboarding.FieldID, field.TypeUUID),
+			},
+		}
+		for _, k := range nodes {
+			edge.Target.Nodes = append(edge.Target.Nodes, k)
+		}
+		_spec.Edges.Add = append(_spec.Edges.Add, edge)
+	}
 	if _u.mutation.MaintenanceEntriesCleared() {
 		edge := &sqlgraph.EdgeSpec{
 			Rel:     sqlgraph.O2M,
@@ -1380,6 +1479,20 @@ func (_u *EntityUpdateOne) SetArchived(v bool) *EntityUpdateOne {
 func (_u *EntityUpdateOne) SetNillableArchived(v *bool) *EntityUpdateOne {
 	if v != nil {
 		_u.SetArchived(*v)
+	}
+	return _u
+}
+
+// SetOffboarded sets the "offboarded" field.
+func (_u *EntityUpdateOne) SetOffboarded(v bool) *EntityUpdateOne {
+	_u.mutation.SetOffboarded(v)
+	return _u
+}
+
+// SetNillableOffboarded sets the "offboarded" field if the given value is not nil.
+func (_u *EntityUpdateOne) SetNillableOffboarded(v *bool) *EntityUpdateOne {
+	if v != nil {
+		_u.SetOffboarded(*v)
 	}
 	return _u
 }
@@ -1761,6 +1874,21 @@ func (_u *EntityUpdateOne) AddFields(v ...*EntityField) *EntityUpdateOne {
 	return _u.AddFieldIDs(ids...)
 }
 
+// AddOffboardingRecordIDs adds the "offboarding_records" edge to the EntityOffboarding entity by IDs.
+func (_u *EntityUpdateOne) AddOffboardingRecordIDs(ids ...uuid.UUID) *EntityUpdateOne {
+	_u.mutation.AddOffboardingRecordIDs(ids...)
+	return _u
+}
+
+// AddOffboardingRecords adds the "offboarding_records" edges to the EntityOffboarding entity.
+func (_u *EntityUpdateOne) AddOffboardingRecords(v ...*EntityOffboarding) *EntityUpdateOne {
+	ids := make([]uuid.UUID, len(v))
+	for i := range v {
+		ids[i] = v[i].ID
+	}
+	return _u.AddOffboardingRecordIDs(ids...)
+}
+
 // AddMaintenanceEntryIDs adds the "maintenance_entries" edge to the MaintenanceEntry entity by IDs.
 func (_u *EntityUpdateOne) AddMaintenanceEntryIDs(ids ...uuid.UUID) *EntityUpdateOne {
 	_u.mutation.AddMaintenanceEntryIDs(ids...)
@@ -1875,6 +2003,27 @@ func (_u *EntityUpdateOne) RemoveFields(v ...*EntityField) *EntityUpdateOne {
 		ids[i] = v[i].ID
 	}
 	return _u.RemoveFieldIDs(ids...)
+}
+
+// ClearOffboardingRecords clears all "offboarding_records" edges to the EntityOffboarding entity.
+func (_u *EntityUpdateOne) ClearOffboardingRecords() *EntityUpdateOne {
+	_u.mutation.ClearOffboardingRecords()
+	return _u
+}
+
+// RemoveOffboardingRecordIDs removes the "offboarding_records" edge to EntityOffboarding entities by IDs.
+func (_u *EntityUpdateOne) RemoveOffboardingRecordIDs(ids ...uuid.UUID) *EntityUpdateOne {
+	_u.mutation.RemoveOffboardingRecordIDs(ids...)
+	return _u
+}
+
+// RemoveOffboardingRecords removes "offboarding_records" edges to EntityOffboarding entities.
+func (_u *EntityUpdateOne) RemoveOffboardingRecords(v ...*EntityOffboarding) *EntityUpdateOne {
+	ids := make([]uuid.UUID, len(v))
+	for i := range v {
+		ids[i] = v[i].ID
+	}
+	return _u.RemoveOffboardingRecordIDs(ids...)
 }
 
 // ClearMaintenanceEntries clears all "maintenance_entries" edges to the MaintenanceEntry entity.
@@ -2088,6 +2237,9 @@ func (_u *EntityUpdateOne) sqlSave(ctx context.Context) (_node *Entity, err erro
 	}
 	if value, ok := _u.mutation.Archived(); ok {
 		_spec.SetField(entity.FieldArchived, field.TypeBool, value)
+	}
+	if value, ok := _u.mutation.Offboarded(); ok {
+		_spec.SetField(entity.FieldOffboarded, field.TypeBool, value)
 	}
 	if value, ok := _u.mutation.AssetID(); ok {
 		_spec.SetField(entity.FieldAssetID, field.TypeInt64, value)
@@ -2388,6 +2540,51 @@ func (_u *EntityUpdateOne) sqlSave(ctx context.Context) (_node *Entity, err erro
 			Bidi:    false,
 			Target: &sqlgraph.EdgeTarget{
 				IDSpec: sqlgraph.NewFieldSpec(entityfield.FieldID, field.TypeUUID),
+			},
+		}
+		for _, k := range nodes {
+			edge.Target.Nodes = append(edge.Target.Nodes, k)
+		}
+		_spec.Edges.Add = append(_spec.Edges.Add, edge)
+	}
+	if _u.mutation.OffboardingRecordsCleared() {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.O2M,
+			Inverse: false,
+			Table:   entity.OffboardingRecordsTable,
+			Columns: []string{entity.OffboardingRecordsColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(entityoffboarding.FieldID, field.TypeUUID),
+			},
+		}
+		_spec.Edges.Clear = append(_spec.Edges.Clear, edge)
+	}
+	if nodes := _u.mutation.RemovedOffboardingRecordsIDs(); len(nodes) > 0 && !_u.mutation.OffboardingRecordsCleared() {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.O2M,
+			Inverse: false,
+			Table:   entity.OffboardingRecordsTable,
+			Columns: []string{entity.OffboardingRecordsColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(entityoffboarding.FieldID, field.TypeUUID),
+			},
+		}
+		for _, k := range nodes {
+			edge.Target.Nodes = append(edge.Target.Nodes, k)
+		}
+		_spec.Edges.Clear = append(_spec.Edges.Clear, edge)
+	}
+	if nodes := _u.mutation.OffboardingRecordsIDs(); len(nodes) > 0 {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.O2M,
+			Inverse: false,
+			Table:   entity.OffboardingRecordsTable,
+			Columns: []string{entity.OffboardingRecordsColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(entityoffboarding.FieldID, field.TypeUUID),
 			},
 		}
 		for _, k := range nodes {

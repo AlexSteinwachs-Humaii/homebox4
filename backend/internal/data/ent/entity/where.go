@@ -101,6 +101,11 @@ func Archived(v bool) predicate.Entity {
 	return predicate.Entity(sql.FieldEQ(FieldArchived, v))
 }
 
+// Offboarded applies equality check predicate on the "offboarded" field. It's identical to OffboardedEQ.
+func Offboarded(v bool) predicate.Entity {
+	return predicate.Entity(sql.FieldEQ(FieldOffboarded, v))
+}
+
 // AssetID applies equality check predicate on the "asset_id" field. It's identical to AssetIDEQ.
 func AssetID(v int64) predicate.Entity {
 	return predicate.Entity(sql.FieldEQ(FieldAssetID, v))
@@ -604,6 +609,16 @@ func ArchivedEQ(v bool) predicate.Entity {
 // ArchivedNEQ applies the NEQ predicate on the "archived" field.
 func ArchivedNEQ(v bool) predicate.Entity {
 	return predicate.Entity(sql.FieldNEQ(FieldArchived, v))
+}
+
+// OffboardedEQ applies the EQ predicate on the "offboarded" field.
+func OffboardedEQ(v bool) predicate.Entity {
+	return predicate.Entity(sql.FieldEQ(FieldOffboarded, v))
+}
+
+// OffboardedNEQ applies the NEQ predicate on the "offboarded" field.
+func OffboardedNEQ(v bool) predicate.Entity {
+	return predicate.Entity(sql.FieldNEQ(FieldOffboarded, v))
 }
 
 // AssetIDEQ applies the EQ predicate on the "asset_id" field.
@@ -1551,6 +1566,29 @@ func HasFields() predicate.Entity {
 func HasFieldsWith(preds ...predicate.EntityField) predicate.Entity {
 	return predicate.Entity(func(s *sql.Selector) {
 		step := newFieldsStep()
+		sqlgraph.HasNeighborsWith(s, step, func(s *sql.Selector) {
+			for _, p := range preds {
+				p(s)
+			}
+		})
+	})
+}
+
+// HasOffboardingRecords applies the HasEdge predicate on the "offboarding_records" edge.
+func HasOffboardingRecords() predicate.Entity {
+	return predicate.Entity(func(s *sql.Selector) {
+		step := sqlgraph.NewStep(
+			sqlgraph.From(Table, FieldID),
+			sqlgraph.Edge(sqlgraph.O2M, false, OffboardingRecordsTable, OffboardingRecordsColumn),
+		)
+		sqlgraph.HasNeighbors(s, step)
+	})
+}
+
+// HasOffboardingRecordsWith applies the HasEdge predicate on the "offboarding_records" edge with a given conditions (other predicates).
+func HasOffboardingRecordsWith(preds ...predicate.EntityOffboarding) predicate.Entity {
+	return predicate.Entity(func(s *sql.Selector) {
+		step := newOffboardingRecordsStep()
 		sqlgraph.HasNeighborsWith(s, step, func(s *sql.Selector) {
 			for _, p := range preds {
 				p(s)

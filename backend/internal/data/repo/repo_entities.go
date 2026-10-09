@@ -105,6 +105,8 @@ type (
 		TagIDs []uuid.UUID `json:"tagIds"`
 	}
 
+	// EntityUpdate intentionally excludes lifecycle state and history. Full edits
+	// (including stale payloads) must use the dedicated lifecycle transitions.
 	EntityUpdate struct {
 		WarrantyExpires types.Date `json:"warrantyExpires"`
 		// Purchase
@@ -140,6 +142,7 @@ type (
 		LifetimeWarranty bool `json:"lifetimeWarranty"`
 	}
 
+	// EntityPatch is also used by CSV imports; it must not write lifecycle state.
 	EntityPatch struct {
 		ID           uuid.UUID   `json:"id"`
 		Quantity     *float64    `json:"quantity,omitempty" extensions:"x-nullable,x-omitempty"`
@@ -2233,6 +2236,8 @@ func (r *EntityRepository) Duplicate(ctx context.Context, gid, id uuid.UUID, opt
 		SetNotes(originalEntity.Notes).
 		SetInsured(originalEntity.Insured).
 		SetArchived(originalEntity.Archived).
+		// A duplicate is a new active asset, not a copy of lifecycle cycles.
+		SetOffboarded(false).
 		SetSyncChildEntityLocations(originalEntity.SyncChildEntityLocations)
 
 	// Skip Set on zero dates so the duplicate's nullable date columns end up
