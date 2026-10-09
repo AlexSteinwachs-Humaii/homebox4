@@ -31,7 +31,13 @@
 </script>
 
 <template>
-  <SidebarMenuButtonChild v-if="!tooltip" v-bind="{ ...delegatedProps, ...$attrs }">
+  <SidebarMenuButtonChild
+    v-if="!tooltip || state !== 'collapsed' || isMobile"
+    v-bind="{ ...delegatedProps, ...$attrs }"
+    :size="tooltip && state !== 'collapsed' ? 'lg' : props.size"
+    :class="tooltip && state !== 'collapsed' ? 'text-xl' : ''"
+    :title="hotkey"
+  >
     <slot />
   </SidebarMenuButtonChild>
 

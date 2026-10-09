@@ -1164,3 +1164,31 @@ h6 {
 .theme-warm-habitat a.text-primary {
   color: hsl(var(--link));
 }
+
+/* Opt-in shell styling uses the shared theme tokens, not screen-local colours. */
+.theme-warm-habitat .habitat-shell {
+  --sidebar-width: 15rem !important;
+}
+.theme-warm-habitat .habitat-shell [data-sidebar='menu-button'] {
+  font-size: 0.9375rem;
+  color: hsl(var(--sidebar-foreground));
+}
+.theme-warm-habitat .habitat-shell [data-sidebar='menu-button'][data-active='true'] {
+  background: hsl(var(--sidebar-primary));
+  color: hsl(var(--sidebar-primary-foreground));
+  font-weight: 600;
+}
+.theme-warm-habitat .habitat-shell main {
+  background: hsl(var(--background));
+}
+.theme-warm-habitat .habitat-shell [role='search'] input {
+  background: hsl(var(--card));
+}
+.theme-warm-habitat .habitat-header .habitat-collection {
+  color: hsl(var(--foreground));
+}
+.theme-warm-habitat .habitat-header {
+  background: hsl(var(--background));
+  border-bottom: 1px solid hsl(var(--border));
+  box-shadow: none;
+}
