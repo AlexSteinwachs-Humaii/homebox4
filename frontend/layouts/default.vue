@@ -192,11 +192,11 @@
               'lg:hidden': preferences.displayLegacyHeader,
             }"
           >
-            <div class="flex h-1/2 items-center gap-2 sm:h-auto">
+            <div class="flex h-1/2 min-w-0 items-center gap-2 sm:h-auto">
               <SidebarTrigger variant="default" />
-              <NuxtLink to="/home">
+              <NuxtLink to="/home" class="min-w-0">
                 <span
-                  class="habitat-collection max-w-48 truncate text-sm text-secondary-foreground"
+                  class="habitat-collection block max-w-48 truncate text-sm text-secondary-foreground"
                   data-testid="header-collection"
                 >
                   {{ selectedCollection?.name ?? $t("components.collection.selector.select_collection") }}

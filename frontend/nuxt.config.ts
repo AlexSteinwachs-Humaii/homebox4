@@ -8,6 +8,19 @@ const larineWidgetToken = process.env.LARINE_WIDGET_TOKEN?.trim();
 export default defineNuxtConfig({
   ssr: false,
 
+  // Shared-pattern browser fixture is never included in normal builds.
+  hooks: {
+    "pages:extend"(pages) {
+      if (process.env.HBOX_TEST_SHARED_PATTERNS === "true") {
+        pages.push({
+          name: "shared-patterns-test",
+          path: "/__test/shared-patterns",
+          file: new URL("./test/fixtures/shared-patterns.vue", import.meta.url).pathname,
+        });
+      }
+    },
+  },
+
   components: {
     dirs: [],
   },

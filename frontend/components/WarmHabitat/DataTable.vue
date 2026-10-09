@@ -7,7 +7,7 @@
 
 <template>
   <Panel class="overflow-hidden">
-    <Table class="habitat-table">
+    <Table class="habitat-table" tabindex="0" role="region" :aria-label="caption">
       <TableCaption class="sr-only">{{ caption }}</TableCaption>
       <slot />
     </Table>

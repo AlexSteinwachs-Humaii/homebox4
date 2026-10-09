@@ -1161,19 +1161,52 @@ h6 {
 
 /* Existing link consumers used primary before link became a semantic token.
    Keep action/button fills crimson without making their anchor text pale red. */
-.theme-warm-habitat a.text-primary {
+.theme-warm-habitat :is(a.text-primary, button.text-primary) {
   color: hsl(var(--link));
+}
+
+/* Anchor actions retain their button foreground, not the prose link colour. */
+.theme-warm-habitat a.text-primary-foreground {
+  color: hsl(var(--primary-foreground));
+}
+.theme-warm-habitat a.text-destructive-foreground {
+  color: hsl(var(--destructive-foreground));
+}
+
+/* Include native links and command inputs that do not use Button/Input rings.
+   An inset outline remains visible inside clipped panels and scrolling regions. */
+.theme-warm-habitat :is(a, button, input, select, textarea, [tabindex]):focus-visible {
+  outline: 2px solid hsl(var(--ring));
+  outline-offset: -2px;
+}
+
+/* Pale destructive fills need a dark inner focus edge; the outer ring stays pale. */
+.theme-warm-habitat .bg-destructive:focus-visible {
+  outline-color: hsl(var(--destructive-foreground));
+}
+
+/* Active state is identifiable without the brand fill, in every theme. */
+[data-sidebar='menu-button'][aria-current='page'] {
+  text-decoration: underline;
+  text-underline-offset: 4px;
+  font-weight: 600;
+}
+
+.habitat-panel,
+.habitat-context {
+  min-width: 0;
+  overflow-wrap: anywhere;
 }
 
 /* Opt-in shell styling uses the shared theme tokens, not screen-local colours. */
 .theme-warm-habitat .habitat-shell {
   --sidebar-width: 15rem !important;
 }
-.theme-warm-habitat .habitat-shell [data-sidebar='menu-button'] {
+.theme-warm-habitat [data-sidebar='menu-button'] {
   font-size: 0.9375rem;
   color: hsl(var(--sidebar-foreground));
 }
-.theme-warm-habitat .habitat-shell [data-sidebar='menu-button'][data-active='true'] {
+.theme-warm-habitat [data-sidebar='menu-button'][data-active='true'] {
   background: hsl(var(--sidebar-primary));
   color: hsl(var(--sidebar-primary-foreground));
   font-weight: 600;
