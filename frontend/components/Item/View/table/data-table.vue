@@ -1,5 +1,6 @@
 <script setup lang="ts" generic="TData, TValue">
   import BaseCard from "@/components/Base/Card.vue";
+  import { requireVisibleColumns } from "./column-visibility";
   import type { ColumnDef, SortingState, VisibilityState, ExpandedState } from "@tanstack/vue-table";
   import {
     getCoreRowModel,
@@ -31,6 +32,7 @@
     columns: ColumnDef<EntitySummary, TValue>[];
     data: EntitySummary[];
     disableControls?: boolean;
+    requiredVisibleColumns?: string[];
     view: "table" | "card";
     locationFlatTree?: FlatTreeItem[];
     externalPagination?: Pagination;
@@ -106,7 +108,7 @@
         return sorting.value;
       },
       get columnVisibility() {
-        return columnVisibility.value;
+        return requireVisibleColumns(columnVisibility.value, props.requiredVisibleColumns);
       },
       get rowSelection() {
         return rowSelection.value;
