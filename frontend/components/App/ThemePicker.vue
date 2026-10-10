@@ -2,16 +2,19 @@
   import { themes } from "~~/lib/data/themes";
   import { useTheme } from "~/composables/use-theme";
 
-  const { setTheme } = useTheme();
+  const { theme: selectedTheme, setTheme } = useTheme();
 </script>
 
 <template>
   <div class="homebox grid grid-cols-1 gap-4 font-sans sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5">
-    <div
+    <button
       v-for="theme in themes"
       :key="theme.value"
+      type="button"
+      :aria-pressed="selectedTheme === theme.value"
+      :aria-label="theme.label"
       :class="'theme-' + theme.value"
-      class="overflow-hidden rounded-lg border outline-2 outline-offset-2"
+      class="overflow-hidden rounded-lg border text-left outline-2 outline-offset-2 focus-visible:outline focus-visible:outline-ring"
       :data-theme="theme.value"
       :data-set-theme="theme.value"
       data-act-class="outline"
@@ -38,7 +41,7 @@
           </div>
         </div>
       </div>
-    </div>
+    </button>
   </div>
 </template>
 

@@ -14,7 +14,9 @@
           <span
             v-if="props.tags.find(t => t.id === item)?.color"
             class="ml-2 size-4 shrink-0 rounded-full"
-            :style="{ backgroundColor: props.tags.find(t => t.id === item)?.color }"
+            :style="{
+              backgroundColor: props.tags.find(t => t.id === item)?.color,
+            }"
           />
           <TagsInputItemText class="py-0.5" />
           <TagsInputItemDelete />
@@ -62,8 +64,12 @@
                 >
                   <span
                     class="mr-2 size-4 shrink-0 rounded-full align-middle"
-                    :class="{ border: props.tags.find(t => t.id === tag.value)?.color }"
-                    :style="{ backgroundColor: props.tags.find(t => t.id === tag.value)?.color }"
+                    :class="{
+                      border: props.tags.find(t => t.id === tag.value)?.color,
+                    }"
+                    :style="{
+                      backgroundColor: props.tags.find(t => t.id === tag.value)?.color,
+                    }"
                   />
                   <div class="flex flex-col gap-1">
                     <span>{{ tag.label }}</span>
@@ -111,6 +117,10 @@
       type: Array as () => TagOut[],
       required: true,
     },
+    allowCreate: {
+      type: Boolean,
+      default: true,
+    },
     name: {
       type: String,
       required: false,
@@ -154,12 +164,16 @@
       .filter(i => !modelValue.value.includes(i.value));
 
     // Only show "Create" option if search term is not empty and no exact match exists
-    if (searchTerm.value.trim() !== "") {
+    if (props.allowCreate && searchTerm.value.trim() !== "") {
       const trimmedSearchTerm = searchTerm.value.trim();
       const hasExactMatch = props.tags.some(tag => tag.name.toLowerCase() === trimmedSearchTerm.toLowerCase());
 
       if (!hasExactMatch) {
-        filtered.push({ value: "create-item", label: `${t("global.create")} ${searchTerm.value}`, ancestors: "" });
+        filtered.push({
+          value: "create-item",
+          label: `${t("global.create")} ${searchTerm.value}`,
+          ancestors: "",
+        });
       }
     }
 

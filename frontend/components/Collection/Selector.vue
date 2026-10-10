@@ -5,12 +5,12 @@
         variant="outline"
         role="combobox"
         :aria-expanded="open"
-        :size="sidebar.state.value === 'collapsed' ? 'icon' : undefined"
-        :class="sidebar.state.value === 'collapsed' ? 'size-10' : 'w-full justify-between drop-shadow-md'"
-        :aria-label="t('components.collection.selector.select_collection')"
-        :title="t('components.collection.selector.select_collection')"
+        :size="collapsed ? 'icon' : undefined"
+        :class="collapsed ? 'size-10' : 'w-full justify-between drop-shadow-md'"
+        :aria-label="selectorLabel"
+        :title="selectorLabel"
       >
-        <template v-if="sidebar.state.value === 'collapsed'">
+        <template v-if="collapsed">
           <MdiHomeGroup class="size-5" />
         </template>
         <template v-else>
@@ -28,9 +28,7 @@
         </template>
       </Button>
     </PopoverTrigger>
-    <PopoverContent
-      :class="[sidebar.state.value === 'collapsed' ? 'min-w-48 p-0' : 'w-[--reka-popper-anchor-width] p-0']"
-    >
+    <PopoverContent :class="[collapsed ? 'min-w-48 p-0' : 'w-[--reka-popper-anchor-width] p-0']">
       <Command :ignore-filter="true">
         <CommandGroup>
           <CommandItem
@@ -42,7 +40,8 @@
               }
             "
           >
-            <Plus class="mr-2 size-4" /> {{ t("components.collection.selector.create_collection") }}
+            <Plus class="mr-2 size-4" />
+            {{ t("components.collection.selector.create_collection") }}
           </CommandItem>
           <CommandItem
             value="join-collection"
@@ -53,7 +52,8 @@
               }
             "
           >
-            <UserPlus class="mr-2 size-4" /> {{ t("components.collection.selector.join_collection") }}
+            <UserPlus class="mr-2 size-4" />
+            {{ t("components.collection.selector.join_collection") }}
           </CommandItem>
           <CommandItem as-child value="collection-settings">
             <NuxtLink to="/collection/members" class="flex w-full items-center" @click="open = false">
@@ -65,7 +65,9 @@
         <CommandInput
           v-model="search"
           :placeholder="t('components.collection.selector.search_collections')"
+          :aria-label="t('components.collection.selector.search_collections')"
           :display-value="_ => ''"
+          @keydown.esc.stop.prevent="open = false"
         />
         <CommandEmpty>{{ t("components.collection.selector.no_collection_found") }}</CommandEmpty>
         <CommandList>
@@ -124,6 +126,10 @@
   }
 
   const sidebar = useSidebar();
+  const collapsed = computed(() => !sidebar.isMobile.value && sidebar.state.value === "collapsed");
+  const selectorLabel = computed(() =>
+    [t("components.collection.selector.select_collection"), selectedCollection.value?.name].filter(Boolean).join(": ")
+  );
 
   const filteredCollections = computed(() => {
     const filtered = fuzzysort.go(search.value, collectionsList.value, { key: "name", all: true }).map(i => i.obj);

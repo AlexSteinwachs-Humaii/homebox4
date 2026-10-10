@@ -69,11 +69,13 @@
   import { Popover, PopoverContent, PopoverTrigger } from "~/components/ui/popover";
   import { cn } from "~/lib/utils";
   import type { EntitySummary } from "~~/lib/api/types/data-contracts";
-  import { useFlatLocations } from "~~/composables/use-location-helpers";
+  import { useFlatLocations, type FlatTreeItem } from "~~/composables/use-location-helpers";
 
   type Props = {
     modelValue?: EntitySummary | null;
     currentLocation?: EntitySummary;
+    /** Caller-supplied, collection-scoped options; legacy callers still use the store. */
+    locations?: FlatTreeItem[];
   };
 
   const props = defineProps<Props>();
@@ -82,7 +84,8 @@
   const open = ref(false);
   const search = ref("");
   const id = useId();
-  const locations = useFlatLocations(props.currentLocation);
+  const storedLocations = props.locations === undefined ? useFlatLocations(props.currentLocation) : ref([]);
+  const locations = computed(() => props.locations ?? storedLocations.value);
   const value = useVModel(props, "modelValue", emit);
 
   function selectLocation(location: EntitySummary) {

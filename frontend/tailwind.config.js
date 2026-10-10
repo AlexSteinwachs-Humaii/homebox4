@@ -3,6 +3,7 @@ export default {
   darkMode: ["class"],
   safelist: [
     "dark",
+    "theme-warm-habitat",
     "theme-aqua",
     "theme-black",
     "theme-bumblebee",
@@ -50,6 +51,7 @@ export default {
         background: "hsl(var(--background))",
         "background-accent": "hsl(var(--background-accent))",
         foreground: "hsl(var(--foreground))",
+        link: "hsl(var(--link, var(--primary)))",
         primary: {
           DEFAULT: "hsl(var(--primary))",
           foreground: "hsl(var(--primary-foreground))",
@@ -142,9 +144,9 @@ export default {
             "--tw-prose-td-borders": "hsl(var(--foreground) / 0.2)",
             color: "hsl(var(--foreground))",
             a: {
-              color: "hsl(var(--primary))",
+              color: "hsl(var(--link, var(--primary)))",
               "&:hover": {
-                color: "hsl(var(--primary) / 0.8)",
+                color: "hsl(var(--link, var(--primary)) / 0.8)",
               },
             },
             h1: {

@@ -1,6 +1,6 @@
 <template>
   <Select :model-value="selectedEntityType" @update:model-value="id => onEntityTypeChanged(id as string)">
-    <SelectTrigger :class="{ 'h-7 p-1': size === 'sm' }">
+    <SelectTrigger :id="id" :class="{ 'h-7 p-1': size === 'sm' }">
       <SelectValue :class="{ 'text-xl': size === 'sm' }" :placeholder="$t('components.entity.selector.placeholder')" />
     </SelectTrigger>
     <SelectContent>
@@ -26,6 +26,7 @@
 
   defineProps<{
     entityTypes: EntityTypeSummary[];
+    id?: string;
     selectedEntityType?: string;
     onEntityTypeChanged: (id: string) => void;
     size?: "sm" | "md";

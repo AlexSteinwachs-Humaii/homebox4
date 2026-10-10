@@ -1,5 +1,23 @@
 <template>
-  <Card>
+  <Card v-if="overview" class="overflow-hidden">
+    <NuxtLink
+      :to="`/location/${location.id}`"
+      :aria-label="$t('locations.open_location', { name: location.name })"
+      class="block transition hover:bg-accent focus-visible:outline focus-visible:outline-2 focus-visible:outline-ring"
+    >
+      <div class="flex h-44 items-center justify-center bg-muted" aria-hidden="true">
+        <MdiMapMarkerOutline class="size-20 text-muted-foreground" />
+      </div>
+      <div class="space-y-3 p-5">
+        <h2 class="break-words font-serif text-2xl">{{ location.name }}</h2>
+        <p v-if="location.description" class="break-words text-sm text-muted-foreground">
+          {{ location.description }}
+        </p>
+        <p class="text-sm text-primary">{{ $t("locations.open_location", { name: location.name }) }} →</p>
+      </div>
+    </NuxtLink>
+  </Card>
+  <Card v-else>
     <NuxtLink :to="`/location/${location.id}`" class="group/location-card transition duration-300">
       <div
         :class="{
@@ -40,6 +58,7 @@
       type: Object as () => EntitySummary | EntityOut,
       required: true,
     },
+    overview: { type: Boolean, default: false },
     dense: {
       type: Boolean,
       default: false,

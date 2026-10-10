@@ -11,6 +11,10 @@
   const itemTags = computed(() => {
     return useTagStore().withAncestors(props.item.tags);
   });
+  // List rows are EntitySummary: the nearest location is parent, not item.location.
+  const locationLabel = computed(
+    () => (props.item as EntitySummary & { locationTrail?: string }).locationTrail || props.item.parent?.name || ""
+  );
 
   const api = useUserApi();
 
@@ -34,8 +38,8 @@
     <div class="flex min-w-0 flex-1 flex-col gap-2">
       <h2 class="truncate text-xl font-bold">{{ item.name }}</h2>
       <Badge class="w-min text-nowrap bg-secondary text-secondary-foreground hover:bg-secondary/70 hover:underline">
-        <NuxtLink v-if="item.location" :to="`/location/${item.location.id}`">
-          {{ item.location.name }}
+        <NuxtLink v-if="item.parent" :to="`/location/${item.parent.id}`">
+          {{ locationLabel }}
         </NuxtLink>
       </Badge>
       <div class="flex flex-wrap gap-2">

@@ -2,7 +2,7 @@
 <script setup lang="ts">
   import { useI18n } from "vue-i18n";
   import { toast } from "@/components/ui/sonner";
-  import type { ItemAttachment, EntityFieldData, EntityOut, EntityUpdate } from "~~/lib/api/types/data-contracts";
+  import type { ItemAttachment, EntityFieldData, EntityOut } from "~~/lib/api/types/data-contracts";
   import { AttachmentTypes } from "~~/lib/api/types/non-generated";
   import { useTagStore } from "~/stores/tags";
   import MdiLoading from "~icons/mdi/loading";
@@ -33,6 +33,11 @@
   import DropZone from "~/components/global/DropZone.vue";
   import EntitySelector from "~/components/Entity/Selector.vue";
   import { useEntityTypeStore } from "~/stores/entityTypes";
+  import { scopedResource } from "~/lib/data/scoped-resource";
+  import Feedback from "~/components/WarmHabitat/Feedback.vue";
+  import ItemContext from "~/components/WarmHabitat/ItemContext.vue";
+  import { fmtDate, useFormatCurrency } from "~/composables/use-formatters";
+  import { editUpdate, validateEdit } from "~/lib/items/item-edit";
 
   const { t } = useI18n();
 
@@ -53,106 +58,128 @@
   const tagStore = useTagStore();
   const tags = computed(() => tagStore.tags);
 
-  const {
-    data: nullableItem,
-    refresh,
-    pending: requestPending,
-  } = useAsyncData(async () => {
-    const { data, error } = await api.items.get(itemId.value);
-    if (error) {
-      toast.error(t("items.toast.failed_load_item"));
-      navigateTo("/home");
-      return;
-    }
+  const parent = ref();
+  const location = ref();
+  const item = ref<EntityOut & { tagIds: string[] }>(null as never);
+  const loadedItem = ref<EntityOut | null>(null);
+  let editGeneration = 0;
+  onBeforeUnmount(() => editGeneration++);
+  const saving = ref(false);
 
-    if (data.parent && data.parent.entityType && !data.parent.entityType.isLocation) {
-      parent.value = data.parent;
-    }
+  const saveError = ref("");
+  const validationErrors = ref<string[]>([]);
+  // Attachments have separate APIs; queue their writes until Save as well.
+  const attachmentChanges: {
+    title: string;
+    run: (client: typeof api, id: string) => Promise<{ error: unknown; status?: number }>;
+  }[] = reactive([]);
 
-    // The "Location" selector shows the derived location (nearest ancestor
-    // that is a location-type entity), not the direct parent — when the item
-    // sits inside another item, the parent is shown in "Parent Item" and the
-    // location stays e.g. "Attic" (#1589).
-    location.value = data.location ?? (data.parent?.entityType?.isLocation ? data.parent : null);
+  const scope = computed(() =>
+    preferences.value.collectionId ? `${preferences.value.collectionId}:${itemId.value}` : null
+  );
+  watch(
+    scope,
+    () => {
+      editGeneration++;
+      saveError.value = "";
+      validationErrors.value = [];
+      attachmentChanges.length = 0;
+      item.value = null as never;
+      loadedItem.value = null;
+      parent.value = null;
+      location.value = null;
+    },
+    { flush: "sync" }
+  );
 
+  const resource = scopedResource(scope, async () => {
+    const { data, error } = await useUserApi().items.get(itemId.value);
+    if (error || !data || data.id !== itemId.value) throw new Error("Unable to load item");
     return data;
   });
 
-  const item = ref<EntityOut & { tagIds: string[] }>(null as never);
-
-  watchEffect(() => {
-    if (nullableItem.value) {
+  watch(
+    resource.data,
+    data => {
+      // Initialize once per scope: refreshes must not overwrite an unsaved draft.
+      if (!data || data.id !== itemId.value || item.value) return;
+      const snapshot = structuredClone(toRaw(data));
+      loadedItem.value = snapshot;
       item.value = {
-        ...nullableItem.value,
-        tagIds: nullableItem.value.tags.map(l => l.id) ?? [],
+        ...structuredClone(snapshot),
+        tagIds: snapshot.tags.map(tag => tag.id),
       };
-    }
-  });
+      parent.value = snapshot.parent?.entityType && !snapshot.parent.entityType.isLocation ? snapshot.parent : null;
+      // Keep the derived location separate from the actual parent item.
+      location.value = snapshot.location ?? (snapshot.parent?.entityType?.isLocation ? snapshot.parent : null);
+    },
+    { immediate: true }
+  );
 
-  onMounted(() => {
-    refresh();
-  });
-
-  const saving = ref(false);
+  const formatCurrency = await useFormatCurrency();
 
   async function saveItem(redirect: boolean) {
-    if (!location.value?.id && !parent.value?.id) {
-      toast.error(t("items.toast.failed_save_no_location"));
-      return;
-    }
+    if (saving.value || !item.value || !loadedItem.value || !scope.value) return;
+    const parentId = parent.value?.id || location.value?.id || null;
+    validationErrors.value = validateEdit(item.value, parentId);
+    saveError.value = "";
+    if (validationErrors.value.length) return;
 
+    const requestScope = scope.value;
+    const generation = editGeneration;
+    const id = loadedItem.value.id;
+    const client = useUserApi(); // Freeze the authorized collection for this submission.
+    const current = () => generation === editGeneration && scope.value === requestScope && !!item.value;
+    const converting = item.value.entityType?.id !== loadedItem.value.entityType?.id;
+    const isLocation = item.value.entityType?.isLocation;
+    const payload = editUpdate(item.value, id, parentId);
     saving.value = true;
-    const isConvertingToLocation = item.value.entityType?.isLocation;
-    if (isConvertingToLocation) {
-      const { isCanceled } = await confirm.open(t("items.edit.change_entity_type_confirm"));
-      if (isCanceled) {
-        saving.value = false;
+    let entitySaved = false;
+    try {
+      if (converting && isLocation) {
+        const { isCanceled } = await confirm.open(t("items.edit.change_entity_type_confirm"));
+        if (isCanceled || !current()) return;
+      }
+      const result = await client.items.update(id, payload);
+      if (!current()) return;
+      if (result.error || result.data?.id !== id) {
+        saveError.value = t([400, 422].includes(result.status) ? "edit_form.save_rejected" : "edit_form.save_failed", {
+          status: result.status,
+        });
         return;
       }
-    }
-
-    let purchasePrice = 0;
-    let soldPrice = 0;
-    if (item.value.purchasePrice) {
-      purchasePrice = item.value.purchasePrice;
-    }
-    if (item.value.soldPrice) {
-      soldPrice = item.value.soldPrice;
-    }
-
-    console.log((item.value.purchasePrice ??= 0));
-    console.log((item.value.soldPrice ??= 0));
-
-    const payload: EntityUpdate = {
-      ...item.value,
-      // A selected parent item is the entity's real parent; otherwise the
-      // item hangs directly off the chosen location.
-      parentId: parent.value?.id || location.value?.id || null,
-      tagIds: item.value.tagIds,
-      assetId: item.value.assetId,
-      purchasePrice,
-      soldPrice,
-      // Date-only fields stay as YYYY-MM-DD strings — see types.Date on the
-      // backend. The form/picker hold strings; sending the spread above is
-      // sufficient.
-      syncChildEntityLocations: item.value.syncChildEntityLocations,
-      entityTypeId: item.value.entityType!.id,
-    };
-
-    const { error } = await api.items.update(itemId.value, payload);
-
-    saving.value = false;
-
-    if (error) {
-      toast.error(t("items.toast.failed_save"));
-      return;
-    }
-
-    toast.success(t("items.toast.item_saved"));
-    if (isConvertingToLocation) {
-      navigateTo("/location/" + itemId.value);
-    } else if (redirect) {
-      navigateTo("/item/" + itemId.value);
+      entitySaved = true;
+      // Remove only completed operations: a failed attachment retains the remaining draft.
+      while (attachmentChanges.length && current()) {
+        const change = attachmentChanges[0]!;
+        const result = await change.run(client, id);
+        if (!current()) return;
+        if (result.error) {
+          saveError.value =
+            result.status === 413
+              ? `${t("items.toast.attachment_too_large")} ${t("edit_form.attachments_failed")}`
+              : t("edit_form.attachments_failed");
+          return;
+        }
+        attachmentChanges.shift();
+      }
+      if (!current()) return;
+      if (!redirect) {
+        const refreshed = await client.items.get(id);
+        if (!current()) return;
+        if (!refreshed.error && refreshed.data?.id === id) {
+          loadedItem.value = structuredClone(refreshed.data);
+          item.value.attachments = structuredClone(refreshed.data.attachments);
+        }
+      }
+      toast.success(t("items.toast.item_saved"));
+      if (isLocation) await navigateTo(`/location/${id}`);
+      else if (redirect) await navigateTo(`/item/${id}`);
+    } catch {
+      if (current())
+        saveError.value = t(entitySaved ? "edit_form.attachments_failed" : "edit_form.save_failed", { status: "—" });
+    } finally {
+      saving.value = false;
     }
   }
 
@@ -212,8 +239,8 @@
     },
     {
       type: "text",
-      label: "items.serial_number",
-      ref: "serialNumber",
+      label: "items.manufacturer",
+      ref: "manufacturer",
       maxLength: 255,
     },
     {
@@ -224,20 +251,20 @@
     },
     {
       type: "text",
-      label: "items.manufacturer",
-      ref: "manufacturer",
+      label: "items.serial_number",
+      ref: "serialNumber",
       maxLength: 255,
+    },
+    {
+      type: "checkbox",
+      label: "items.insured",
+      ref: "insured",
     },
     {
       type: "markdown",
       label: "items.notes",
       ref: "notes",
       maxLength: 1000,
-    },
-    {
-      type: "checkbox",
-      label: "items.insured",
-      ref: "insured",
     },
     {
       type: "checkbox",
@@ -395,21 +422,11 @@
     const attachmentType = zoneEl?.getAttribute("data-link-type") || "attachment";
 
     const title = fallbackLinkTitle(droppedURL);
-    const { data, error } = await api.items.attachments.addExternalLink(
-      itemId.value,
-      "link",
-      droppedURL,
+    if (saving.value) return;
+    attachmentChanges.push({
       title,
-      attachmentType
-    );
-
-    if (error) {
-      toast.error(t("items.toast.failed_upload_attachment"));
-      return;
-    }
-
-    toast.success(t("items.toast.attachment_uploaded"));
-    item.value.attachments = data.attachments;
+      run: (client, id) => client.items.attachments.addExternalLink(id, "link", droppedURL, title, attachmentType),
+    });
   }
 
   async function uploadAttachment(files: File[] | null, type: AttachmentTypes | null) {
@@ -417,37 +434,31 @@
       return;
     }
 
-    const { data, error, status } = await api.items.attachments.add(itemId.value, files[0], files[0].name, type);
-
-    if (error) {
-      toast.error(status === 413 ? t("items.toast.attachment_too_large") : t("items.toast.failed_upload_attachment"));
-      return;
+    if (saving.value) return;
+    for (const file of files) {
+      attachmentChanges.push({
+        title: file.name,
+        run: (client, id) => client.items.attachments.add(id, file, file.name, type),
+      });
     }
-
-    toast.success(t("items.toast.attachment_uploaded"));
-
-    await saveItem(false);
-
-    item.value.attachments = data.attachments;
   }
 
   const confirm = useConfirm();
 
   async function deleteAttachment(attachmentId: string) {
+    const generation = editGeneration;
     const confirmed = await confirm.open(t("items.delete_attachment_confirm"));
 
     if (confirmed.isCanceled) {
       return;
     }
 
-    const { error } = await api.items.attachments.delete(itemId.value, attachmentId);
-
-    if (error) {
-      toast.error(t("items.toast.failed_delete_attachment"));
-      return;
-    }
-
-    toast.success(t("items.toast.attachment_deleted"));
+    if (saving.value || !item.value || generation !== editGeneration) return;
+    const attachment = item.value.attachments.find(a => a.id === attachmentId);
+    attachmentChanges.push({
+      title: attachment?.title || attachmentId,
+      run: (client, id) => client.items.attachments.delete(id, attachmentId),
+    });
     item.value.attachments = item.value.attachments.filter(a => a.id !== attachmentId);
   }
 
@@ -477,29 +488,25 @@
     editState.obj = attachmentOpts.find(o => o.value === attachment.type) || attachmentOpts[0]!;
   }
 
-  async function updateAttachment() {
-    editState.loading = true;
-    const { error, data } = await api.items.attachments.update(itemId.value, editState.id, {
+  function updateAttachment() {
+    if (saving.value || !item.value) return;
+    const attachmentId = editState.id;
+    const change = {
       title: editState.title,
       type: editState.type,
       primary: editState.primary,
+    };
+    attachmentChanges.push({
+      title: change.title,
+      run: (client, id) => client.items.attachments.update(id, attachmentId, change),
     });
-
-    if (error) {
-      toast.error(t("items.toast.failed_delete_attachment"));
-      return;
-    }
-
-    item.value.attachments = data.attachments;
-
-    editState.loading = false;
+    const attachment = item.value.attachments.find(a => a.id === attachmentId);
+    if (attachment) Object.assign(attachment, change);
     closeDialog(DialogID.AttachmentEdit);
 
     editState.id = "";
     editState.title = "";
     editState.type = "";
-
-    toast.success(t("items.toast.attachment_updated"));
   }
 
   function addField() {
@@ -514,13 +521,9 @@
     } as unknown as EntityFieldData);
   }
 
-  const { query, results, isLoading, triggerSearch } = useItemSearch(api, { immediate: false });
-  const parent = ref();
-  // Derived location shown in the "Location" selector. Kept separate from
-  // `parent` (the "Parent Item" selector): when a parent item is chosen it
-  // becomes the entity's real parent, while this stays the location the item
-  // ultimately lives in (#1589).
-  const location = ref();
+  const { query, results, isLoading, triggerSearch } = useItemSearch(api, {
+    immediate: false,
+  });
 
   async function keyboardSave(e: KeyboardEvent) {
     // Cmd + S
@@ -538,7 +541,9 @@
 
   async function maybeSyncWithParentLocation() {
     if (parent.value && parent.value.id) {
-      const { data, error } = await api.items.get(parent.value.id);
+      const generation = editGeneration;
+      const { data, error } = await useUserApi().items.get(parent.value.id);
+      if (generation !== editGeneration || !item.value) return;
 
       if (error) {
         toast.error(t("items.toast.error_loading_parent_data"));
@@ -564,34 +569,6 @@
     }
   }
 
-  async function syncChildEntityLocations() {
-    if (!location.value?.id && !parent.value?.id) {
-      toast.error(t("items.toast.failed_save_no_location"));
-      return;
-    }
-
-    const payload: EntityUpdate = {
-      ...item.value,
-      parentId: parent.value?.id || location.value?.id || null,
-      tagIds: item.value.tagIds,
-      assetId: item.value.assetId,
-      syncChildEntityLocations: item.value.syncChildEntityLocations,
-    };
-
-    const { error } = await api.items.update(itemId.value, payload);
-
-    if (error) {
-      toast.error(t("items.toast.failed_save"));
-      return;
-    }
-
-    if (!item.value.syncChildEntityLocations) {
-      toast.success(t("items.toast.child_items_location_no_longer_synced"));
-    } else {
-      toast.success(t("items.toast.child_items_location_synced"));
-    }
-  }
-
   onMounted(() => {
     window.addEventListener("keydown", keyboardSave);
   });
@@ -602,7 +579,21 @@
 </script>
 
 <template>
-  <div v-if="item" class="pb-8">
+  <Feedback v-if="resource.error.value" :title="t('items.toast.failed_load_item')" />
+  <div v-else-if="!item" class="py-8" role="status">
+    {{ $t("edit_form.loading") }}
+  </div>
+  <div v-else class="space-y-6 pb-8">
+    <ItemContext :title="t('edit_form.title', { name: loadedItem?.name })" :description="t('edit_form.subtitle')">
+      <template #breadcrumb>
+        <NuxtLink
+          :to="`/item/${loadedItem!.id}`"
+          class="text-sm text-link underline"
+          @click="saving && $event.preventDefault()"
+          >{{ t("edit_form.back") }}</NuxtLink
+        >
+      </template>
+    </ItemContext>
     <Dialog :dialog-id="DialogID.AttachmentEdit">
       <DialogContent>
         <DialogHeader>
@@ -611,7 +602,9 @@
 
         <FormTextField v-model="editState.title" :label="$t('items.edit.edit_attachment_dialog.attachment_title')" />
         <div>
-          <Label for="attachment-type"> {{ $t("items.edit.edit_attachment_dialog.attachment_type") }} </Label>
+          <Label for="attachment-type">
+            {{ $t("items.edit.edit_attachment_dialog.attachment_type") }}
+          </Label>
           <Select id="attachment-type" v-model:model-value="editState.type">
             <SelectTrigger>
               <SelectValue :placeholder="$t('items.edit.edit_attachment_dialog.select_type')" />
@@ -636,7 +629,7 @@
         </div>
 
         <DialogFooter>
-          <Button :disabled="editState.loading" @click="updateAttachment">
+          <Button :disabled="editState.loading || saving" @click="updateAttachment">
             <MdiLoading v-if="editState.loading" class="animate-spin" />
             {{ $t("global.update") }}
           </Button>
@@ -664,16 +657,44 @@
             <TooltipContent>{{ $t("items.show_advanced_view_options") }}</TooltipContent>
           </Tooltip>
         </TooltipProvider>
+        <Button variant="outline" :disabled="saving" @click="navigateTo(`/item/${loadedItem!.id}`)">
+          {{ $t("global.cancel") }}
+        </Button>
         <Button size="sm" :disabled="saving" @click="saveItem(true)">
           <MdiLoading v-if="saving" class="animate-spin" />
           <MdiContentSaveOutline v-else />
           {{ $t("global.save") }}
         </Button>
       </div>
-      <div v-if="!requestPending" class="space-y-6">
+      <div
+        v-if="saveError || validationErrors.length"
+        role="alert"
+        class="mb-4 rounded-md border border-destructive p-4"
+      >
+        <p v-if="saveError">{{ saveError }}</p>
+        <ul v-if="validationErrors.length" class="list-inside list-disc">
+          <li v-for="field in validationErrors" :key="field">
+            {{ t(`edit_form.validation.${field}`) }}
+          </li>
+        </ul>
+      </div>
+      <fieldset
+        v-if="!resource.pending.value"
+        :disabled="saving"
+        class="grid min-w-0 items-start gap-6 lg:grid-cols-[minmax(0,2fr)_minmax(0,1fr)] [&>div:not(:first-child)]:lg:col-span-2"
+      >
         <BaseCard class="overflow-visible">
-          <template #title> {{ $t("items.edit_details") }} </template>
-          <div class="mb-6 grid gap-4 border-t px-5 pt-2 md:grid-cols-2">
+          <template #title> {{ $t("capture.item_information") }} </template>
+          <div class="border-t p-5">
+            <FormTextField
+              v-model="item.name"
+              :label="t('capture.name_required')"
+              :required="true"
+              :min-length="1"
+              :max-length="255"
+            />
+          </div>
+          <div class="mb-6 grid gap-4 px-5 pt-2 md:grid-cols-2">
             <LocationSelector v-model="location" @update:model-value="onLocationChanged()" />
             <ItemSelector
               v-model="parent"
@@ -688,8 +709,8 @@
               @update:model-value="maybeSyncWithParentLocation()"
             />
             <div class="flex flex-col gap-2">
-              <Label class="px-1">{{ $t("items.sync_child_locations") }}</Label>
-              <Switch v-model="item.syncChildEntityLocations" @update:model-value="syncChildEntityLocations()" />
+              <Label for="edit-sync-child-locations" class="px-1">{{ $t("items.sync_child_locations") }}</Label>
+              <Switch id="edit-sync-child-locations" v-model="item.syncChildEntityLocations" />
             </div>
             <TagSelector v-model="item.tagIds" :tags="tags" />
             <div class="flex flex-col gap-1">
@@ -702,14 +723,17 @@
             </div>
           </div>
 
-          <div class="border-t sm:p-0">
-            <div v-for="field in mainFields" :key="field.ref" class="grid grid-cols-1 sm:divide-y">
-              <div class="border-b px-4 pb-4 pt-2 sm:px-6">
+          <div class="grid gap-5 border-t p-5 sm:grid-cols-2">
+            <div
+              v-for="field in mainFields.filter(field => field.ref !== 'name')"
+              :key="field.ref"
+              :class="['name', 'description', 'notes'].includes(field.ref) ? 'sm:col-span-2' : ''"
+            >
+              <div>
                 <FormTextArea
                   v-if="field.type === 'textarea'"
                   v-model="item[field.ref]"
                   :label="$t(field.label)"
-                  inline
                   :max-length="field.maxLength"
                   :min-length="field.minLength"
                 />
@@ -724,7 +748,6 @@
                   v-else-if="field.type === 'text'"
                   v-model="item[field.ref]"
                   :label="$t(field.label)"
-                  inline
                   type="text"
                   :max-length="field.maxLength"
                   :min-length="field.minLength"
@@ -736,24 +759,54 @@
                   step="any"
                   :min="field.min"
                   :label="$t(field.label)"
-                  inline
                 />
-                <FormDatePicker
-                  v-else-if="field.type === 'date'"
-                  v-model="item[field.ref]"
-                  :label="$t(field.label)"
-                  inline
-                />
+                <FormDatePicker v-else-if="field.type === 'date'" v-model="item[field.ref]" :label="$t(field.label)" />
                 <FormCheckbox
                   v-else-if="field.type === 'checkbox'"
                   v-model="item[field.ref]"
                   :label="$t(field.label)"
-                  inline
                 />
               </div>
             </div>
           </div>
         </BaseCard>
+
+        <aside
+          v-if="loadedItem"
+          class="space-y-6 lg:col-start-2 lg:row-start-1"
+          :aria-label="t('edit_form.purchase_context')"
+        >
+          <Card class="p-6">
+            <p class="font-semibold">{{ loadedItem.name }}</p>
+            <p class="mt-1 text-sm text-muted-foreground">{{ $t("items.asset_id") }}: {{ loadedItem.assetId }}</p>
+            <h2 class="habitat-heading mt-6 text-2xl">
+              {{ t("edit_form.purchase_context") }}
+            </h2>
+            <p class="mt-2 text-sm text-muted-foreground">
+              {{ t("edit_form.context_note") }}
+            </p>
+            <dl class="mt-4 divide-y">
+              <div class="flex justify-between gap-3 py-4">
+                <dt>{{ t("items.purchase_price") }}</dt>
+                <dd class="font-semibold">
+                  {{ formatCurrency(loadedItem.purchasePrice) }}
+                </dd>
+              </div>
+              <div class="flex justify-between gap-3 py-4">
+                <dt>{{ t("items.purchase_date") }}</dt>
+                <dd class="font-semibold">
+                  {{ loadedItem.purchaseDate ? fmtDate(loadedItem.purchaseDate) : t("edit_form.not_recorded") }}
+                </dd>
+              </div>
+              <div class="flex justify-between gap-3 py-4">
+                <dt>{{ t("items.archived") }}</dt>
+                <dd class="font-semibold">
+                  {{ loadedItem.archived ? t("global.yes") : t("global.no") }}
+                </dd>
+              </div>
+            </dl>
+          </Card>
+        </aside>
 
         <BaseCard v-if="preferences.editorAdvancedView">
           <template #title> {{ $t("items.custom_fields") }} </template>
@@ -779,7 +832,9 @@
             </div>
           </div>
           <div class="mt-4 flex justify-end px-5 pb-4">
-            <Button size="sm" @click="addField"> {{ $t("global.add") }} </Button>
+            <Button size="sm" @click="addField">
+              {{ $t("global.add") }}
+            </Button>
           </div>
         </BaseCard>
 
@@ -790,16 +845,30 @@
           @drop.prevent="handleAttachmentCardDrop"
         >
           <div class="px-4 py-5 sm:px-6">
-            <h3 class="text-lg font-medium leading-6">{{ $t("items.attachments") }}</h3>
-            <p class="text-xs">{{ $t("items.changes_persisted_immediately") }}</p>
+            <h3 class="text-lg font-medium leading-6">
+              {{ $t("items.attachments") }}
+            </h3>
+            <p class="text-xs">
+              {{ $t("edit_form.attachments_on_save") }}
+            </p>
           </div>
           <div class="border-t p-4">
             <div v-if="attDropZoneActive" class="grid grid-cols-4 gap-4">
-              <DropZone data-link-type="photo" @drop="dropPhoto"> {{ $t("items.photos") }} </DropZone>
-              <DropZone data-link-type="warranty" @drop="dropWarranty"> {{ $t("items.warranty") }} </DropZone>
-              <DropZone data-link-type="manual" @drop="dropManual"> {{ $t("items.manuals") }} </DropZone>
-              <DropZone data-link-type="attachment" @drop="dropAttachment"> {{ $t("items.attachments") }} </DropZone>
-              <DropZone data-link-type="receipt" @drop="dropReceipt"> {{ $t("items.receipts") }} </DropZone>
+              <DropZone data-link-type="photo" @drop="dropPhoto">
+                {{ $t("items.photos") }}
+              </DropZone>
+              <DropZone data-link-type="warranty" @drop="dropWarranty">
+                {{ $t("items.warranty") }}
+              </DropZone>
+              <DropZone data-link-type="manual" @drop="dropManual">
+                {{ $t("items.manuals") }}
+              </DropZone>
+              <DropZone data-link-type="attachment" @drop="dropAttachment">
+                {{ $t("items.attachments") }}
+              </DropZone>
+              <DropZone data-link-type="receipt" @drop="dropReceipt">
+                {{ $t("items.receipts") }}
+              </DropZone>
             </div>
             <button
               v-else
@@ -813,6 +882,14 @@
           </div>
 
           <div class="border-t p-4">
+            <div v-if="attachmentChanges.length" class="mb-4" role="status">
+              <p>{{ t("edit_form.pending_attachments") }}</p>
+              <ul class="list-inside list-disc">
+                <li v-for="(change, index) in attachmentChanges" :key="index">
+                  {{ change.title }}
+                </li>
+              </ul>
+            </div>
             <ul role="list" class="divide-y rounded-md border">
               <li
                 v-for="attachment in item.attachments"
@@ -839,6 +916,7 @@
                               attachmentId: attachment.id,
                               thumbnailId: attachment.thumbnail?.id,
                               mimeType: attachment.mimeType,
+                              readOnly: true,
                             },
                             onClose: result => {
                               if (result?.action === 'delete') {
@@ -895,7 +973,9 @@
 
         <Card v-if="preferences.editorAdvancedView" class="overflow-visible shadow-xl">
           <div class="px-4 py-5 sm:px-6">
-            <h3 class="text-lg font-medium leading-6">{{ $t("items.purchase_details") }}</h3>
+            <h3 class="text-lg font-medium leading-6">
+              {{ $t("items.purchase_details") }}
+            </h3>
           </div>
           <div class="border-t sm:p-0">
             <div v-for="field in purchaseFields" :key="field.ref" class="grid grid-cols-1 sm:divide-y">
@@ -944,7 +1024,9 @@
 
         <Card v-if="preferences.editorAdvancedView" class="overflow-visible shadow-xl">
           <div class="px-4 py-5 sm:px-6">
-            <h3 class="text-lg font-medium leading-6">{{ $t("items.warranty_details") }}</h3>
+            <h3 class="text-lg font-medium leading-6">
+              {{ $t("items.warranty_details") }}
+            </h3>
           </div>
           <div class="border-t sm:p-0">
             <div v-for="field in warrantyFields" :key="field.ref" class="grid grid-cols-1 sm:divide-y">
@@ -993,7 +1075,9 @@
 
         <Card v-if="preferences.editorAdvancedView" class="overflow-visible shadow-xl">
           <div class="px-4 py-5 sm:px-6">
-            <h3 class="text-lg font-medium leading-6">{{ $t("items.sold_details") }}</h3>
+            <h3 class="text-lg font-medium leading-6">
+              {{ $t("items.sold_details") }}
+            </h3>
           </div>
           <div class="border-t sm:p-0">
             <div v-for="field in soldFields" :key="field.ref" class="grid grid-cols-1 sm:divide-y">
@@ -1039,7 +1123,7 @@
             </div>
           </div>
         </Card>
-      </div>
+      </fieldset>
     </section>
   </div>
 </template>

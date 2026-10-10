@@ -12,6 +12,8 @@
   import BaseSectionHeader from "@/components/Base/SectionHeader.vue";
   import LocationTreeRoot from "~/components/Location/Tree/Root.vue";
   import BaseCard from "@/components/Base/Card.vue";
+  import LocationCard from "~/components/Location/Card.vue";
+  import { locationBranches, useLocationOverview } from "~/composables/use-location-overview";
 
   const { t } = useI18n();
 
@@ -25,25 +27,25 @@
     title: "HomeBox | " + t("menu.locations"),
   });
 
-  const api = useUserApi();
-
-  const { data: tree } = useAsyncData(async () => {
-    const { data, error } = await api.items.getTree({
-      withItems: true,
-    });
-
-    if (error) {
-      return [];
-    }
-
-    return data;
-  });
+  const prefs = useViewPreferences();
+  const { selectedCollection } = useCollections();
+  const collectionId = computed(() => prefs.value.collectionId);
+  const { roots, tree, loading, failed, refresh } = useLocationOverview(collectionId, () => useUserApi().items);
+  onServerEvent(ServerEvent.EntityMutation, () => void refresh());
 
   const locationTreeId = "locationTree";
   const showItemsKey = "showItems";
 
   const treeState = useTreeState(locationTreeId);
   const showItems = ref(true);
+  const visibleTree = computed(() => (showItems.value ? tree.value : locationBranches(tree.value)));
+  watch(
+    collectionId,
+    () => {
+      treeState.value = {};
+    },
+    { flush: "sync" }
+  );
 
   const route = useRouter();
 
@@ -53,10 +55,13 @@
 
     if (query && query[locationTreeId]) {
       console.debug("setting tree state from query params");
-      const data = JSON.parse(query[locationTreeId] as string);
-
-      for (const key in data) {
-        treeState.value[key] = data[key];
+      try {
+        const data = JSON.parse(query[locationTreeId] as string);
+        for (const key in data) {
+          if (typeof data[key] === "boolean") treeState.value[key] = data[key];
+        }
+      } catch {
+        // A malformed saved expansion state must not prevent browsing.
       }
     }
 
@@ -97,7 +102,7 @@
   function openItemChildren(items: TreeItem[]) {
     for (const item of items) {
       if (item.children.length > 0) {
-        treeState.value[item.id.replace(/-/g, "").substring(0, 8)] = true;
+        treeState.value[item.id] = true;
         openItemChildren(item.children);
       }
     }
@@ -113,13 +118,22 @@
 <template>
   <BaseContainer>
     <div class="mb-2 flex justify-between">
-      <BaseSectionHeader> {{ $t("menu.locations") }} </BaseSectionHeader>
+      <BaseSectionHeader>
+        {{ $t("menu.locations") }}
+        <template #description>{{ $t("locations.overview_description") }}</template>
+      </BaseSectionHeader>
       <div>
         <TooltipProvider :delay-duration="0">
           <ButtonGroup>
             <Tooltip>
-              <TooltipTrigger>
-                <Button size="icon" variant="outline" data-pos="start" @click="openAll">
+              <TooltipTrigger as-child>
+                <Button
+                  :aria-label="$t('locations.expand_tree')"
+                  size="icon"
+                  variant="outline"
+                  data-pos="start"
+                  @click="openAll"
+                >
                   <MdiExpandAllOutline />
                 </Button>
               </TooltipTrigger>
@@ -128,8 +142,14 @@
               </TooltipContent>
             </Tooltip>
             <Tooltip>
-              <TooltipTrigger>
-                <Button size="icon" variant="outline" data-pos="middle" @click="closeAll">
+              <TooltipTrigger as-child>
+                <Button
+                  :aria-label="$t('locations.collapse_tree')"
+                  size="icon"
+                  variant="outline"
+                  data-pos="middle"
+                  @click="closeAll"
+                >
                   <MdiCollapseAllOutline />
                 </Button>
               </TooltipTrigger>
@@ -138,8 +158,10 @@
               </TooltipContent>
             </Tooltip>
             <Tooltip>
-              <TooltipTrigger>
+              <TooltipTrigger as-child>
                 <Button
+                  :aria-label="showItems ? $t('locations.hide_items') : $t('locations.show_items')"
+                  :aria-pressed="showItems"
                   size="icon"
                   :variant="showItems ? 'default' : 'outline'"
                   data-pos="end"
@@ -149,22 +171,46 @@
                 </Button>
               </TooltipTrigger>
               <TooltipContent>
-                <p>{{ showItems ? $t("locations.hide_items") : $t("locations.show_items") }}</p>
+                <p>
+                  {{ showItems ? $t("locations.hide_items") : $t("locations.show_items") }}
+                </p>
               </TooltipContent>
             </Tooltip>
           </ButtonGroup>
         </TooltipProvider>
       </div>
     </div>
-    <BaseCard>
-      <div class="p-2">
-        <LocationTreeRoot
-          v-if="tree && Array.isArray(tree)"
-          :locs="tree"
-          :tree-id="locationTreeId"
-          :show-items="showItems"
-        />
-      </div>
+    <p class="mb-5 text-sm text-muted-foreground">
+      {{ selectedCollection?.name }}
+    </p>
+    <BaseCard v-if="loading" class="p-6" role="status">{{ $t("locations.loading") }}</BaseCard>
+    <BaseCard v-else-if="failed" class="p-6" role="alert">
+      <p>{{ $t("locations.load_failed") }}</p>
+      <Button class="mt-3" variant="outline" @click="refresh">{{ $t("locations.retry") }}</Button>
     </BaseCard>
+    <div v-else-if="collectionId" class="grid items-start gap-6 lg:grid-cols-[minmax(0,18rem)_minmax(0,1fr)]">
+      <BaseCard class="min-w-0 overflow-x-auto p-4">
+        <h2 :id="locationTreeId" class="mb-4 font-serif text-2xl">
+          {{ $t("locations.your_spaces") }}
+        </h2>
+        <LocationTreeRoot :locs="visibleTree" :tree-id="locationTreeId" :show-items="true" />
+      </BaseCard>
+      <div class="min-w-0 space-y-6">
+        <div class="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
+          <LocationCard v-for="location in roots" :key="location.id" :location="location" overview />
+        </div>
+        <BaseCard class="p-6">
+          <h2 class="mb-2 font-serif text-2xl">
+            {{ $t("locations.follow_trail") }}
+          </h2>
+          <p class="text-sm text-muted-foreground">
+            {{ $t("locations.trail_help") }}
+          </p>
+        </BaseCard>
+        <p v-if="roots.length" class="text-sm text-muted-foreground">
+          {{ $t("locations.illustration_help") }}
+        </p>
+      </div>
+    </div>
   </BaseContainer>
 </template>

@@ -19,18 +19,21 @@
 
   const image = reactive<{
     attachmentId: string;
+    readOnly: boolean;
     itemId: string;
     originalSrc: string;
     originalType?: string;
     thumbnailSrc?: string;
   }>({
     attachmentId: "",
+    readOnly: false,
     itemId: "",
     originalSrc: "",
   });
 
   onMounted(() => {
     const cleanup = registerOpenDialogCallback(DialogID.ItemImage, params => {
+      image.readOnly = !!params.readOnly;
       image.attachmentId = params.attachmentId;
       image.itemId = params.itemId;
       if (params.type === "preloaded") {
@@ -50,6 +53,7 @@
   });
 
   async function deleteAttachment() {
+    if (image.readOnly) return;
     const confirmed = await confirm.open(t("items.delete_attachment_confirm"));
 
     if (confirmed.isCanceled) {
@@ -85,7 +89,13 @@
           class="min-w-64 max-w-[min(calc(100vw_-_1rem),32rem)] md:w-auto md:max-w-lg"
         />
       </picture>
-      <Button variant="destructive" size="icon" class="absolute right-[84px] top-1" @click="deleteAttachment">
+      <Button
+        v-if="!image.readOnly"
+        variant="destructive"
+        size="icon"
+        class="absolute right-[84px] top-1"
+        @click="deleteAttachment"
+      >
         <MdiDelete />
       </Button>
       <a :class="buttonVariants({ size: 'icon' })" :href="image.originalSrc" download class="absolute right-11 top-1">

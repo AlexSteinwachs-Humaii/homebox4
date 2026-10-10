@@ -25,16 +25,11 @@
           :src="imageUrl"
           :alt="item.name"
         />
-        <div class="absolute inset-x-1 bottom-1">
-          <Badge class="text-wrap bg-secondary text-secondary-foreground hover:bg-secondary/70 hover:underline">
-            <NuxtLink v-if="item.parent" :to="`/location/${item.parent.id}`">
-              {{ locationString }}
-            </NuxtLink>
-          </Badge>
-        </div>
       </div>
       <div class="col-span-4 flex grow flex-col gap-y-1 p-4 pt-2">
-        <h2 class="line-clamp-2 text-ellipsis text-wrap text-lg font-bold">{{ item.name }}</h2>
+        <h2 class="line-clamp-2 text-ellipsis text-wrap text-lg font-bold">
+          {{ item.name }}
+        </h2>
         <Separator class="mb-1" />
         <TooltipProvider :delay-duration="0">
           <div class="flex items-center gap-2">
@@ -73,6 +68,14 @@
         </div>
       </div>
     </NuxtLink>
+    <!-- A separate link, not an anchor nested inside the item link. -->
+    <div v-if="item.parent" class="absolute inset-x-1 top-[170px]">
+      <NuxtLink :to="`/location/${item.parent.id}`">
+        <Badge class="text-wrap bg-secondary text-secondary-foreground hover:bg-secondary/70 hover:underline">
+          {{ locationString }}
+        </Badge>
+      </NuxtLink>
+    </div>
   </Card>
 </template>
 
