@@ -109,7 +109,7 @@ describe("item capture persistence", () => {
     input.purchaseFrom = "";
     input.insured = false;
     const payload = captureUpdate(record, input);
-    expect(payload.purchasePrice).toBeNull();
+    expect(payload.purchasePrice).toBe(0);
     expect(payload.purchaseDate).toBe(record.purchaseDate);
     expect(payload.purchaseFrom).toBe("");
     expect(payload.insured).toBe(false);

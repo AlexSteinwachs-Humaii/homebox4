@@ -17,7 +17,8 @@ export function captureUpdate(entity: EntityOut, form: ItemFormData): EntityUpda
     quantity: Number(form.quantity),
     tagIds: [...form.tagIds],
     insured: form.insured,
-    purchasePrice: form.purchasePrice === "" ? null : Number(form.purchasePrice),
+    // EntityUpdate.purchasePrice is a float64. JSON null is rejected, so a blank optional price is stored as 0, matching the existing edit form.
+    purchasePrice: form.purchasePrice === "" || form.purchasePrice == null ? 0 : Number(form.purchasePrice),
     purchaseDate: form.purchaseDate || entity.purchaseDate,
     purchaseFrom: form.purchaseFrom,
     archived: entity.archived,
