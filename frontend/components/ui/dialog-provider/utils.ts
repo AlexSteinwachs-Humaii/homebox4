@@ -62,6 +62,7 @@ export type DialogParamsMap = {
   ) & {
     itemId: string;
     attachmentId: string;
+    readOnly?: boolean;
   };
   [DialogID.CreateEntity]: { baseType: "item"; product?: BarcodeProduct; subItem?: true } | { baseType: "location" };
   [DialogID.ProductImport]?: { barcode?: string };

@@ -5,7 +5,25 @@
         "back": "Back to item",
         "purchase_context": "Purchase context",
         "context_note": "Existing purchase information stays with this record.",
-        "not_recorded": "Not recorded"
+        "not_recorded": "Not recorded",
+        "save_failed": "Save failed (status {status}). Your draft is still here. Check your connection or access, then try Save again.",
+        "save_rejected": "Save failed (status {status}). Your draft is still here. Review and correct the field values, then try Save again.",
+        "attachments_failed": "Item values were saved, but an attachment change failed. Remaining changes are still here. Check your connection or access, then try Save again.",
+        "pending_attachments": "Attachment changes waiting for Save:",
+        "validation": {
+            "name": "Enter a name of 1–255 bytes.",
+            "entityTypeId": "Select an entity type.",
+            "location": "Select a parent item or location.",
+            "quantity": "Enter a quantity of zero or more.",
+            "description": "Keep the description within 1000 bytes.",
+            "purchaseFrom": "Keep Purchased From within 255 bytes.",
+            "soldTo": "Keep Sold To within 255 bytes.",
+            "purchasePrice": "Enter a purchase price of zero or more.",
+            "soldPrice": "Enter a sale price of zero or more.",
+            "purchaseDate": "Choose a valid purchase date.",
+            "soldDate": "Choose a valid sale date.",
+            "warrantyExpires": "Choose a valid warranty expiry date."
+        }
     },
     "collection": {
         "copy_invite": "Copy Invite Link",
