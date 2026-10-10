@@ -494,7 +494,8 @@
         "item": "Item",
         "location": "Location",
         "entity": "Entity",
-        "entity_type": "Entity Type"
+        "entity_type": "Entity Type",
+        "retry": "Retry"
     },
     "home": {
         "overview_description": "A clear picture of everything you keep.",
@@ -1065,5 +1066,14 @@
             "restore_started": "Restore started — refresh shortly to see imported items.",
             "wipe_inventory_success": "Successfully wiped inventory. { results } items deleted."
         }
+    },
+    "inventory": {
+        "search_placeholder": "Search names, asset IDs, or descriptions",
+        "direct_locations": "Locations (direct parent)",
+        "filters_failed": "Unable to load inventory filters",
+        "loading": "Loading inventory…",
+        "price_note": "Purchase price is per unit. Recorded collection value uses price × quantity.",
+        "unit_price": "Purchase price / unit",
+        "showing": "Showing {count} of {total} item records"
     }
 }
