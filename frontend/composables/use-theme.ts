@@ -52,7 +52,9 @@ export function useIsThemeInList(list: DaisyTheme[]) {
 }
 
 export const themes = [
+  "homebox",
   "dark",
+  "theme-claude",
   "theme-aqua",
   "theme-black",
   "theme-bumblebee",

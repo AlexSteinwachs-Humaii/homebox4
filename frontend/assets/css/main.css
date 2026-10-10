@@ -36,6 +36,39 @@
     --radius: 0.5rem;
 }
 
+  /* Warm cream surfaces and terracotta controls; foreground pairs meet WCAG AA. */
+  .theme-claude {
+    --background: 40 33% 96%;
+    --background-accent: 35 25% 89%;
+    --foreground: 30 8% 18%;
+    --primary: 16 42% 40%;
+    --primary-foreground: 40 33% 98%;
+    --secondary: 35 22% 88%;
+    --secondary-foreground: 30 8% 22%;
+    --accent: 18 38% 88%;
+    --accent-foreground: 16 42% 30%;
+    --muted: 35 22% 91%;
+    --muted-foreground: 30 8% 38%;
+    --card: 40 40% 98%;
+    --card-foreground: 30 8% 18%;
+    --popover: 40 40% 98%;
+    --popover-foreground: 30 8% 18%;
+    --destructive: 0 58% 40%;
+    --destructive-foreground: 40 33% 98%;
+    --input: 30 12% 47%;
+    --border: 30 12% 47%;
+    --ring: 16 42% 40%;
+    --sidebar-background: 35 25% 92%;
+    --sidebar-foreground: 30 8% 18%;
+    --sidebar-primary: 16 42% 40%;
+    --sidebar-primary-foreground: 40 33% 98%;
+    --sidebar-accent: 18 38% 88%;
+    --sidebar-accent-foreground: 16 42% 30%;
+    --sidebar-border: 30 12% 47%;
+    --sidebar-ring: 16 42% 40%;
+    --radius: 0.5rem;
+  }
+
   /*
   * The below themes are based on the daisyUI themes which are licensed under the MIT License.
   * Copyright (c) 2020 Pouya Saadeghi

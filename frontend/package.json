@@ -12,7 +12,8 @@
     "typecheck": "pnpm nuxi typecheck --noEmit",
     "test:ci": "TEST_SHUTDOWN_API_SERVER=true vitest --run --config ./test/vitest.config.ts --no-file-parallelism",
     "test:local": "TEST_SHUTDOWN_API_SERVER=false && vitest --run --config ./test/vitest.config.ts",
-    "test:watch": " TEST_SHUTDOWN_API_SERVER=false vitest --config ./test/vitest.config.ts"
+    "test:watch": " TEST_SHUTDOWN_API_SERVER=false vitest --config ./test/vitest.config.ts",
+    "test:theme": "vitest --run --config ./test/vitest.theme.config.ts"
   },
   "devDependencies": {
     "@eslint/compat": "^1.4.1",
