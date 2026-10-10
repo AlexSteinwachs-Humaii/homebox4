@@ -1,4 +1,5 @@
 <script setup lang="ts">
+  import { reactive, ref, watch } from "vue";
   import { DialogRoot } from "reka-ui";
   import { useI18n } from "vue-i18n";
   import { DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
@@ -9,6 +10,7 @@
   import { offboardingOutcomes, offboardingValidation } from "@/lib/items/offboarding";
   import { toDateOnlyString } from "@/lib/datelib/dateOnly";
   import type { EntityOffboardRequest } from "@/lib/api/types/data-contracts";
+  import { useUserApi } from "@/composables/use-api";
 
   const props = defineProps<{
     open: boolean;
@@ -29,7 +31,7 @@
   watch(
     () => props.open,
     open => {
-      if (open) {
+      if (open && !pending.value) {
         Object.assign(form, {
           outcome: "sold",
           effectiveDate: toDateOnlyString(new Date()),
@@ -38,7 +40,8 @@
         });
         error.value = "";
       }
-    }
+    },
+    { immediate: true }
   );
   function close(open: boolean) {
     if (!pending.value) emit("update:open", open);

@@ -65,6 +65,10 @@ for (const width of [1440, 390]) {
       await expect(page.getByRole("status")).toHaveText("Offboarded");
       for (let cycle = 1; cycle <= index + 1; cycle++)
         await expect(page.getByText(`Cycle ${cycle} notes`, { exact: true })).toBeVisible();
+      const cycles = page.locator("ol li").filter({ hasText: /Cycle \d+ notes/ });
+      await expect(cycles).toHaveCount(index + 1);
+      for (let cycle = 0; cycle <= index; cycle++)
+        await expect(cycles.nth(cycle)).toContainText(`Cycle ${cycle + 1} notes`);
       if (index === 5) {
         await expect(page.getByText("Returned to supplier", { exact: true })).toBeVisible();
         await expect(page.getByText("2026-10-09", { exact: false }).first()).toBeVisible();
@@ -80,6 +84,17 @@ for (const width of [1440, 390]) {
         await expect(page).toHaveURL(`/item/${item.id}`);
       }
       await openAction("Reactivate");
+      if (index === 0) {
+        await page.route("**/api/v1/entities/*/reactivate", route =>
+          route.fulfill({ status: 500, json: { error: "Failed" } })
+        );
+        await dialog.getByRole("button", { name: "Reactivate", exact: true }).click();
+        await expect(dialog.getByRole("alert")).toContainText("Unable to save");
+        // Reka makes the background aria-hidden while the retry dialog remains open.
+        await expect(page.getByRole("status", { includeHidden: true })).toHaveText("Offboarded");
+        await expect(page.getByText("Cycle 1 notes", { exact: true })).toBeVisible();
+        await page.unroute("**/api/v1/entities/*/reactivate");
+      }
       await dialog.getByRole("button", { name: "Reactivate", exact: true }).click();
       await expect(dialog).toHaveCount(0);
       await expect(page.getByRole("status")).toHaveText("Active");

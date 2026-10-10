@@ -1,8 +1,15 @@
 <script setup lang="ts">
+  import { computed } from "vue";
   import type { EntityOffboardingRecord } from "@/lib/api/types/data-contracts";
   import BaseCard from "@/components/Base/Card.vue";
   import DateTime from "@/components/global/DateTime.vue";
-  defineProps<{ records: EntityOffboardingRecord[]; offboarded: boolean }>();
+  const props = defineProps<{ records: EntityOffboardingRecord[]; offboarded: boolean }>();
+  // Order lifecycle cycles by when they were recorded, not their user-entered effective dates.
+  const chronologicalRecords = computed(() =>
+    [...props.records].sort(
+      (a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime() || a.id.localeCompare(b.id)
+    )
+  );
 </script>
 
 <template>
@@ -13,7 +20,7 @@
         {{ $t(offboarded ? "items.lifecycle.offboarded" : "items.lifecycle.active") }}
       </p>
       <ol class="space-y-4">
-        <li v-for="record in records" :key="record.id" class="space-y-2 break-words border-t pt-4">
+        <li v-for="record in chronologicalRecords" :key="record.id" class="space-y-2 break-words border-t pt-4">
           <p class="font-medium">
             {{ $t(`items.lifecycle.outcomes.${record.outcome}`) }} —
             {{ record.effectiveDate }}
