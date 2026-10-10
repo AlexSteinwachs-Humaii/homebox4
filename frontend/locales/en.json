@@ -849,6 +849,8 @@
             "scope": "Directly in this location",
             "scope_help": "Direct children only. Items inside child places or containers are not included.",
             "trail": "Location trail",
+            "back": "Back to Locations",
+            "this_location": "This location",
             "local_context": "Storage place",
             "empty": "No item records directly in this location. Child places may contain items.",
             "unavailable": "This location is unavailable or you do not have access to it.",

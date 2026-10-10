@@ -205,6 +205,9 @@
   <div>
     <ItemImageDialog />
 
+    <NuxtLink to="/locations" class="mb-4 inline-block text-sm text-primary hover:underline">
+      {{ $t("locations.contents.back") }}
+    </NuxtLink>
     <p class="mb-4 text-sm text-muted-foreground">
       {{ selectedCollection?.name }}
     </p>
@@ -218,9 +221,14 @@
       $t("locations.contents.select_collection")
     }}</BaseCard>
     <div v-else-if="location">
-      <header class="mb-6">
-        <h1 class="font-serif text-4xl">{{ location.name }}</h1>
-        <Markdown v-if="location.description" class="mt-2 text-muted-foreground" :source="location.description" />
+      <header class="mb-6 flex flex-wrap items-center justify-between gap-4">
+        <div class="min-w-0">
+          <h1 class="break-words font-serif text-4xl">{{ location.name }}</h1>
+          <Markdown v-if="location.description" class="mt-2 text-muted-foreground" :source="location.description" />
+        </div>
+        <Button as-child>
+          <NuxtLink to="/items">{{ $t("home.view_inventory") }}</NuxtLink>
+        </Button>
       </header>
       <div class="grid min-w-0 gap-6 lg:grid-cols-[250px_minmax(0,1fr)]">
         <Panel>
@@ -231,7 +239,14 @@
           >
           <ol class="space-y-3 p-6">
             <li v-for="entry in fullpath" :key="entry.id" class="break-words text-sm">
-              {{ entry.name }}
+              <span v-if="entry.id === locationId" aria-current="page" class="font-semibold">{{ entry.name }}</span>
+              <NuxtLink
+                v-else
+                :to="`/${entry.type === 'location' ? 'location' : 'item'}/${entry.id}`"
+                class="text-primary hover:underline"
+              >
+                {{ entry.name }}
+              </NuxtLink>
             </li>
             <li v-if="!fullpath.some(entry => entry.id === locationId)" class="font-semibold">
               {{ location.name }}
@@ -243,7 +258,9 @@
             </h3>
             <ul class="space-y-2 text-sm text-muted-foreground">
               <li v-for="child in childPlaces" :key="child.id">
-                {{ child.name }}
+                <NuxtLink :to="`/location/${child.id}`" class="text-primary hover:underline">
+                  {{ child.name }}
+                </NuxtLink>
               </li>
             </ul>
           </div>
@@ -255,6 +272,14 @@
             </h2>
             <Badge variant="secondary">{{ $t("locations.contents.scope") }}</Badge>
           </template>
+          <nav :aria-label="$t('locations.child_locations')" class="flex flex-wrap gap-2 border-b p-4">
+            <Button variant="secondary" aria-current="page" @click="page = 1">{{
+              $t("locations.contents.this_location")
+            }}</Button>
+            <Button v-for="child in childPlaces" :key="child.id" as-child variant="outline">
+              <NuxtLink :to="`/location/${child.id}`">{{ child.name }}</NuxtLink>
+            </Button>
+          </nav>
           <p class="border-b p-4 text-sm text-muted-foreground">
             {{ $t("locations.contents.scope_help") }}
           </p>
