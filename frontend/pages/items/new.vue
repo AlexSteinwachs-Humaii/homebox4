@@ -12,6 +12,8 @@
   import { scopedResource } from "~/lib/data/scoped-resource";
   import { emptyItemForm } from "~/lib/items/item-form";
   import { flatTree } from "~/composables/use-location-helpers";
+  import { useItemCapture } from "~/composables/use-item-capture";
+  import { useLocationStore } from "~/stores/locations";
 
   definePageMeta({ middleware: ["auth"] });
   const { t } = useI18n();
@@ -22,6 +24,22 @@
   const { selectedCollection } = useCollections();
   const { openDialog } = useDialog();
   const form = ref(emptyItemForm());
+  const capture = useItemCapture(collectionId, () => useUserApi().items);
+  const locations = useLocationStore();
+  const locked = computed(
+    () => capture.pending.value || capture.stage.value === "uncertain" || capture.stage.value === "saved"
+  );
+  async function save() {
+    if (!metadata.data.value) return;
+    const id = await capture.save(form.value, metadata.data.value);
+    if (!id) return;
+    // Overview and Inventory load fresh scoped resources on mount; clear the shared location cache too.
+    locations.parents = null;
+    locations.Locations = null;
+    locations.tree = null;
+    locations.refreshLocationsPromise = null;
+    await navigateTo(`/item/${id}`);
+  }
   let initialized = false;
   // No identity or options may survive a collection switch.
   watch(
@@ -86,9 +104,32 @@
         ><Button variant="outline" @click="metadata.refresh">{{ t("global.retry") }}</Button></template
       >
     </Feedback>
-    <!-- Persistence is added by the next story; never drop purchase fields through EntityCreate. -->
-    <form v-else-if="metadata.data.value" class="space-y-6" @submit.prevent>
-      <div class="grid items-start gap-6 lg:grid-cols-[2fr_1fr]">
+    <form v-else-if="metadata.data.value" class="space-y-6" @submit.prevent="save">
+      <Feedback
+        v-if="capture.stage.value !== 'idle' && capture.stage.value !== 'saved'"
+        :title="t(`capture.${capture.stage.value}`)"
+        tone="error"
+      >
+        <p v-if="capture.status.value">
+          {{ t("capture.request_status", { status: capture.status.value }) }}
+        </p>
+        <ul v-if="capture.errors.value.length" class="list-inside list-disc">
+          <li v-for="field in capture.errors.value" :key="field">
+            {{ t(`capture.validation.${field}`) }}
+          </li>
+        </ul>
+        <NuxtLink v-if="capture.entity.value" :to="`/item/${capture.entity.value.id}`" class="text-link underline">
+          {{ t("capture.view_existing", { id: capture.entity.value.id }) }}
+        </NuxtLink>
+        <NuxtLink v-if="capture.stage.value === 'uncertain'" to="/items" class="text-link underline">{{
+          t("items.back_to_inventory")
+        }}</NuxtLink>
+      </Feedback>
+      <fieldset
+        :disabled="locked"
+        :aria-busy="capture.pending.value"
+        class="grid min-w-0 items-start gap-6 lg:grid-cols-[2fr_1fr]"
+      >
         <Panel>
           <template #header
             ><h2 class="habitat-heading text-2xl">
@@ -125,14 +166,24 @@
             }}</Button>
           </Panel>
         </aside>
-      </div>
+      </fieldset>
       <footer class="flex flex-wrap items-center justify-between gap-4 border-t pt-6">
         <p id="capture-save-status" class="text-sm text-muted-foreground">
-          {{ t("capture.save_pending") }}
+          {{ t(capture.entity.value ? "capture.leave_partial" : "capture.save_help") }}
         </p>
         <div class="flex gap-3">
-          <Button type="button" variant="outline" @click="cancel">{{ t("global.cancel") }}</Button>
-          <Button type="submit" disabled aria-describedby="capture-save-status">{{ t("capture.save_item") }}</Button>
+          <Button type="button" variant="outline" :disabled="capture.pending.value" @click="cancel">{{
+            t(capture.entity.value ? "items.back_to_inventory" : "global.cancel")
+          }}</Button>
+          <Button type="submit" :disabled="locked" aria-describedby="capture-save-status">{{
+            t(
+              capture.pending.value
+                ? "capture.saving"
+                : capture.entity.value
+                  ? "capture.retry_update"
+                  : "capture.save_item"
+            )
+          }}</Button>
         </div>
       </footer>
     </form>

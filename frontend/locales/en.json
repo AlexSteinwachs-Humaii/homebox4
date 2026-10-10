@@ -513,7 +513,27 @@
         "help": "A clear name and location make this item easier to find later. Purchase details and tags are optional.",
         "advanced_help": "Need templates, barcode scanning, photos, or a new location? These remain available in advanced creation. It opens a separate form and does not copy these entries.",
         "advanced": "Open advanced creation",
-        "save_pending": "Saving this form will be enabled with the capture persistence step. Advanced creation is available now.",
+        "save_help": "Save creates the item and stores its purchase details before opening the record.",
+        "saving": "Saving…",
+        "retry_update": "Retry saving details",
+        "invalid": "Check the fields below. Your entries have been retained.",
+        "create_failed": "The request was rejected. Check your entries and collection access, then retry.",
+        "uncertain": "We could not confirm whether the item was created. Check Inventory before starting another capture; Save is disabled to avoid a duplicate.",
+        "partial": "The item exists, but its details are not fully saved. Your entries are retained. Retry updates this same record, not a new item.",
+        "leave_partial": "Leaving does not delete the existing item. Unsaved details remain only in this form.",
+        "view_existing": "View existing record ({id})",
+        "request_status": "Request status: {status}",
+        "validation": {
+            "entityTypeId": "Select an item type from this collection.",
+            "location": "Select a location from this collection.",
+            "name": "Enter a name of 1–255 bytes.",
+            "quantity": "Enter a quantity of zero or more.",
+            "description": "Keep the description within 1,000 bytes.",
+            "tagIds": "Select only tags from this collection.",
+            "purchasePrice": "Enter a purchase price of zero or more, or leave it blank.",
+            "purchaseDate": "Enter a valid purchase date (YYYY-MM-DD), or leave it blank.",
+            "purchaseFrom": "Keep the vendor within 255 bytes."
+        },
         "save_item": "Save item"
     },
     "home": {
