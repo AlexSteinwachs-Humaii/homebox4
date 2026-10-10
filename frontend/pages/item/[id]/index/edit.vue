@@ -33,6 +33,10 @@
   import DropZone from "~/components/global/DropZone.vue";
   import EntitySelector from "~/components/Entity/Selector.vue";
   import { useEntityTypeStore } from "~/stores/entityTypes";
+  import { scopedResource } from "~/lib/data/scoped-resource";
+  import Feedback from "~/components/WarmHabitat/Feedback.vue";
+  import ItemContext from "~/components/WarmHabitat/ItemContext.vue";
+  import { fmtDate, useFormatCurrency } from "~/composables/use-formatters";
 
   const { t } = useI18n();
 
@@ -53,48 +57,49 @@
   const tagStore = useTagStore();
   const tags = computed(() => tagStore.tags);
 
-  const {
-    data: nullableItem,
-    refresh,
-    pending: requestPending,
-  } = useAsyncData(
-    () => `item-edit:${preferences.value.collectionId}:${itemId.value}`,
-    async () => {
-      const { data, error } = await api.items.get(itemId.value);
-      if (error || !data || data.id !== itemId.value) {
-        toast.error(t("items.toast.failed_load_item"));
-        navigateTo("/items");
-        return;
-      }
-
-      if (data.parent && data.parent.entityType && !data.parent.entityType.isLocation) {
-        parent.value = data.parent;
-      }
-
-      // The "Location" selector shows the derived location (nearest ancestor
-      // that is a location-type entity), not the direct parent — when the item
-      // sits inside another item, the parent is shown in "Parent Item" and the
-      // location stays e.g. "Attic" (#1589).
-      location.value = data.location ?? (data.parent?.entityType?.isLocation ? data.parent : null);
-
-      return data;
-    }
+  const parent = ref();
+  const location = ref();
+  const item = ref<EntityOut & { tagIds: string[] }>(null as never);
+  const loadedItem = ref<EntityOut | null>(null);
+  const scope = computed(() =>
+    preferences.value.collectionId ? `${preferences.value.collectionId}:${itemId.value}` : null
+  );
+  watch(
+    scope,
+    () => {
+      item.value = null as never;
+      loadedItem.value = null;
+      parent.value = null;
+      location.value = null;
+    },
+    { flush: "sync" }
   );
 
-  const item = ref<EntityOut & { tagIds: string[] }>(null as never);
+  const resource = scopedResource(scope, async () => {
+    const { data, error } = await api.items.get(itemId.value);
+    if (error || !data || data.id !== itemId.value) throw new Error("Unable to load item");
+    return data;
+  });
 
-  watchEffect(() => {
-    if (nullableItem.value) {
+  watch(
+    resource.data,
+    data => {
+      // Initialize once per scope: refreshes must not overwrite an unsaved draft.
+      if (!data || data.id !== itemId.value || item.value) return;
+      const snapshot = structuredClone(toRaw(data));
+      loadedItem.value = snapshot;
       item.value = {
-        ...nullableItem.value,
-        tagIds: nullableItem.value.tags.map(l => l.id) ?? [],
+        ...structuredClone(snapshot),
+        tagIds: snapshot.tags.map(tag => tag.id),
       };
-    }
-  });
+      parent.value = snapshot.parent?.entityType && !snapshot.parent.entityType.isLocation ? snapshot.parent : null;
+      // Keep the derived location separate from the actual parent item.
+      location.value = snapshot.location ?? (snapshot.parent?.entityType?.isLocation ? snapshot.parent : null);
+    },
+    { immediate: true }
+  );
 
-  onMounted(() => {
-    refresh();
-  });
+  const formatCurrency = await useFormatCurrency();
 
   const saving = ref(false);
 
@@ -215,8 +220,8 @@
     },
     {
       type: "text",
-      label: "items.serial_number",
-      ref: "serialNumber",
+      label: "items.manufacturer",
+      ref: "manufacturer",
       maxLength: 255,
     },
     {
@@ -227,20 +232,20 @@
     },
     {
       type: "text",
-      label: "items.manufacturer",
-      ref: "manufacturer",
+      label: "items.serial_number",
+      ref: "serialNumber",
       maxLength: 255,
+    },
+    {
+      type: "checkbox",
+      label: "items.insured",
+      ref: "insured",
     },
     {
       type: "markdown",
       label: "items.notes",
       ref: "notes",
       maxLength: 1000,
-    },
-    {
-      type: "checkbox",
-      label: "items.insured",
-      ref: "insured",
     },
     {
       type: "checkbox",
@@ -517,13 +522,9 @@
     } as unknown as EntityFieldData);
   }
 
-  const { query, results, isLoading, triggerSearch } = useItemSearch(api, { immediate: false });
-  const parent = ref();
-  // Derived location shown in the "Location" selector. Kept separate from
-  // `parent` (the "Parent Item" selector): when a parent item is chosen it
-  // becomes the entity's real parent, while this stays the location the item
-  // ultimately lives in (#1589).
-  const location = ref();
+  const { query, results, isLoading, triggerSearch } = useItemSearch(api, {
+    immediate: false,
+  });
 
   async function keyboardSave(e: KeyboardEvent) {
     // Cmd + S
@@ -576,6 +577,7 @@
     const payload: EntityUpdate = {
       ...item.value,
       parentId: parent.value?.id || location.value?.id || null,
+      entityTypeId: item.value.entityType!.id,
       tagIds: item.value.tagIds,
       assetId: item.value.assetId,
       syncChildEntityLocations: item.value.syncChildEntityLocations,
@@ -605,7 +607,16 @@
 </script>
 
 <template>
-  <div v-if="item" class="pb-8">
+  <Feedback v-if="resource.error.value" :title="t('items.toast.failed_load_item')" />
+  <div v-else-if="!item" class="py-8" role="status">
+    {{ $t("capture.loading") }}
+  </div>
+  <div v-else class="space-y-6 pb-8">
+    <ItemContext :title="t('edit_form.title', { name: loadedItem?.name })" :description="t('edit_form.subtitle')">
+      <template #breadcrumb>
+        <NuxtLink :to="`/item/${itemId}`" class="text-sm text-link underline">{{ t("edit_form.back") }}</NuxtLink>
+      </template>
+    </ItemContext>
     <Dialog :dialog-id="DialogID.AttachmentEdit">
       <DialogContent>
         <DialogHeader>
@@ -614,7 +625,9 @@
 
         <FormTextField v-model="editState.title" :label="$t('items.edit.edit_attachment_dialog.attachment_title')" />
         <div>
-          <Label for="attachment-type"> {{ $t("items.edit.edit_attachment_dialog.attachment_type") }} </Label>
+          <Label for="attachment-type">
+            {{ $t("items.edit.edit_attachment_dialog.attachment_type") }}
+          </Label>
           <Select id="attachment-type" v-model:model-value="editState.type">
             <SelectTrigger>
               <SelectValue :placeholder="$t('items.edit.edit_attachment_dialog.select_type')" />
@@ -673,10 +686,22 @@
           {{ $t("global.save") }}
         </Button>
       </div>
-      <div v-if="!requestPending" class="space-y-6">
+      <div
+        v-if="!resource.pending.value"
+        class="grid items-start gap-6 lg:grid-cols-[minmax(0,2fr)_minmax(0,1fr)] [&>div:not(:first-child)]:lg:col-span-2"
+      >
         <BaseCard class="overflow-visible">
-          <template #title> {{ $t("items.edit_details") }} </template>
-          <div class="mb-6 grid gap-4 border-t px-5 pt-2 md:grid-cols-2">
+          <template #title> {{ $t("capture.item_information") }} </template>
+          <div class="border-t p-5">
+            <FormTextField
+              v-model="item.name"
+              :label="t('capture.name_required')"
+              :required="true"
+              :min-length="1"
+              :max-length="255"
+            />
+          </div>
+          <div class="mb-6 grid gap-4 px-5 pt-2 md:grid-cols-2">
             <LocationSelector v-model="location" @update:model-value="onLocationChanged()" />
             <ItemSelector
               v-model="parent"
@@ -705,14 +730,17 @@
             </div>
           </div>
 
-          <div class="border-t sm:p-0">
-            <div v-for="field in mainFields" :key="field.ref" class="grid grid-cols-1 sm:divide-y">
-              <div class="border-b px-4 pb-4 pt-2 sm:px-6">
+          <div class="grid gap-5 border-t p-5 sm:grid-cols-2">
+            <div
+              v-for="field in mainFields.filter(field => field.ref !== 'name')"
+              :key="field.ref"
+              :class="['name', 'description', 'notes'].includes(field.ref) ? 'sm:col-span-2' : ''"
+            >
+              <div>
                 <FormTextArea
                   v-if="field.type === 'textarea'"
                   v-model="item[field.ref]"
                   :label="$t(field.label)"
-                  inline
                   :max-length="field.maxLength"
                   :min-length="field.minLength"
                 />
@@ -727,7 +755,6 @@
                   v-else-if="field.type === 'text'"
                   v-model="item[field.ref]"
                   :label="$t(field.label)"
-                  inline
                   type="text"
                   :max-length="field.maxLength"
                   :min-length="field.minLength"
@@ -739,24 +766,54 @@
                   step="any"
                   :min="field.min"
                   :label="$t(field.label)"
-                  inline
                 />
-                <FormDatePicker
-                  v-else-if="field.type === 'date'"
-                  v-model="item[field.ref]"
-                  :label="$t(field.label)"
-                  inline
-                />
+                <FormDatePicker v-else-if="field.type === 'date'" v-model="item[field.ref]" :label="$t(field.label)" />
                 <FormCheckbox
                   v-else-if="field.type === 'checkbox'"
                   v-model="item[field.ref]"
                   :label="$t(field.label)"
-                  inline
                 />
               </div>
             </div>
           </div>
         </BaseCard>
+
+        <aside
+          v-if="loadedItem"
+          class="space-y-6 lg:col-start-2 lg:row-start-1"
+          :aria-label="t('edit_form.purchase_context')"
+        >
+          <Card class="p-6">
+            <p class="font-semibold">{{ loadedItem.name }}</p>
+            <p class="mt-1 text-sm text-muted-foreground">{{ $t("items.asset_id") }}: {{ loadedItem.assetId }}</p>
+            <h2 class="habitat-heading mt-6 text-2xl">
+              {{ t("edit_form.purchase_context") }}
+            </h2>
+            <p class="mt-2 text-sm text-muted-foreground">
+              {{ t("edit_form.context_note") }}
+            </p>
+            <dl class="mt-4 divide-y">
+              <div class="flex justify-between gap-3 py-4">
+                <dt>{{ t("items.purchase_price") }}</dt>
+                <dd class="font-semibold">
+                  {{ formatCurrency(loadedItem.purchasePrice) }}
+                </dd>
+              </div>
+              <div class="flex justify-between gap-3 py-4">
+                <dt>{{ t("items.purchase_date") }}</dt>
+                <dd class="font-semibold">
+                  {{ loadedItem.purchaseDate ? fmtDate(loadedItem.purchaseDate) : t("edit_form.not_recorded") }}
+                </dd>
+              </div>
+              <div class="flex justify-between gap-3 py-4">
+                <dt>{{ t("items.archived") }}</dt>
+                <dd class="font-semibold">
+                  {{ loadedItem.archived ? t("global.yes") : t("global.no") }}
+                </dd>
+              </div>
+            </dl>
+          </Card>
+        </aside>
 
         <BaseCard v-if="preferences.editorAdvancedView">
           <template #title> {{ $t("items.custom_fields") }} </template>
@@ -782,7 +839,9 @@
             </div>
           </div>
           <div class="mt-4 flex justify-end px-5 pb-4">
-            <Button size="sm" @click="addField"> {{ $t("global.add") }} </Button>
+            <Button size="sm" @click="addField">
+              {{ $t("global.add") }}
+            </Button>
           </div>
         </BaseCard>
 
@@ -793,16 +852,30 @@
           @drop.prevent="handleAttachmentCardDrop"
         >
           <div class="px-4 py-5 sm:px-6">
-            <h3 class="text-lg font-medium leading-6">{{ $t("items.attachments") }}</h3>
-            <p class="text-xs">{{ $t("items.changes_persisted_immediately") }}</p>
+            <h3 class="text-lg font-medium leading-6">
+              {{ $t("items.attachments") }}
+            </h3>
+            <p class="text-xs">
+              {{ $t("items.changes_persisted_immediately") }}
+            </p>
           </div>
           <div class="border-t p-4">
             <div v-if="attDropZoneActive" class="grid grid-cols-4 gap-4">
-              <DropZone data-link-type="photo" @drop="dropPhoto"> {{ $t("items.photos") }} </DropZone>
-              <DropZone data-link-type="warranty" @drop="dropWarranty"> {{ $t("items.warranty") }} </DropZone>
-              <DropZone data-link-type="manual" @drop="dropManual"> {{ $t("items.manuals") }} </DropZone>
-              <DropZone data-link-type="attachment" @drop="dropAttachment"> {{ $t("items.attachments") }} </DropZone>
-              <DropZone data-link-type="receipt" @drop="dropReceipt"> {{ $t("items.receipts") }} </DropZone>
+              <DropZone data-link-type="photo" @drop="dropPhoto">
+                {{ $t("items.photos") }}
+              </DropZone>
+              <DropZone data-link-type="warranty" @drop="dropWarranty">
+                {{ $t("items.warranty") }}
+              </DropZone>
+              <DropZone data-link-type="manual" @drop="dropManual">
+                {{ $t("items.manuals") }}
+              </DropZone>
+              <DropZone data-link-type="attachment" @drop="dropAttachment">
+                {{ $t("items.attachments") }}
+              </DropZone>
+              <DropZone data-link-type="receipt" @drop="dropReceipt">
+                {{ $t("items.receipts") }}
+              </DropZone>
             </div>
             <button
               v-else
@@ -898,7 +971,9 @@
 
         <Card v-if="preferences.editorAdvancedView" class="overflow-visible shadow-xl">
           <div class="px-4 py-5 sm:px-6">
-            <h3 class="text-lg font-medium leading-6">{{ $t("items.purchase_details") }}</h3>
+            <h3 class="text-lg font-medium leading-6">
+              {{ $t("items.purchase_details") }}
+            </h3>
           </div>
           <div class="border-t sm:p-0">
             <div v-for="field in purchaseFields" :key="field.ref" class="grid grid-cols-1 sm:divide-y">
@@ -947,7 +1022,9 @@
 
         <Card v-if="preferences.editorAdvancedView" class="overflow-visible shadow-xl">
           <div class="px-4 py-5 sm:px-6">
-            <h3 class="text-lg font-medium leading-6">{{ $t("items.warranty_details") }}</h3>
+            <h3 class="text-lg font-medium leading-6">
+              {{ $t("items.warranty_details") }}
+            </h3>
           </div>
           <div class="border-t sm:p-0">
             <div v-for="field in warrantyFields" :key="field.ref" class="grid grid-cols-1 sm:divide-y">
@@ -996,7 +1073,9 @@
 
         <Card v-if="preferences.editorAdvancedView" class="overflow-visible shadow-xl">
           <div class="px-4 py-5 sm:px-6">
-            <h3 class="text-lg font-medium leading-6">{{ $t("items.sold_details") }}</h3>
+            <h3 class="text-lg font-medium leading-6">
+              {{ $t("items.sold_details") }}
+            </h3>
           </div>
           <div class="border-t sm:p-0">
             <div v-for="field in soldFields" :key="field.ref" class="grid grid-cols-1 sm:divide-y">

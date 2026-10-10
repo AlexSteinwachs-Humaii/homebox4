@@ -1,4 +1,12 @@
 {
+    "edit_form": {
+        "title": "Edit {name}",
+        "subtitle": "Keep its details accurate and its location easy to find.",
+        "back": "Back to item",
+        "purchase_context": "Purchase context",
+        "context_note": "Existing purchase information stays with this record.",
+        "not_recorded": "Not recorded"
+    },
     "collection": {
         "copy_invite": "Copy Invite Link",
         "create_invite": "Create Invite",
