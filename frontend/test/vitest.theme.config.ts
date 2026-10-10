@@ -5,9 +5,12 @@ import { defineConfig } from "vitest/config";
 export default defineConfig({
   test: {
     environment: "jsdom",
-    include: ["test/claude-theme.test.ts"],
+    include: ["test/claude*.test.ts"],
   },
   resolve: {
-    alias: { "~~": fileURLToPath(new URL("..", import.meta.url)) },
+    alias: {
+      "~": fileURLToPath(new URL("..", import.meta.url)),
+      "~~": fileURLToPath(new URL("..", import.meta.url)),
+    },
   },
 });

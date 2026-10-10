@@ -69,7 +69,7 @@ describe("Claude palette", () => {
   });
 
   it("defines every existing palette token explicitly and preserves layout radius", () => {
-    const baseline = css.match(/:root,\.homebox\s*\{([^}]+)\}/)![1]!;
+    const baseline = css.match(/\.theme-homebox\s*\{([^}]+)\}/)![1]!;
     const keys = [...baseline.matchAll(/--([\w-]+):/g)].map(m => m[1]);
     expect(Object.keys(tokens).sort()).toEqual(keys.sort());
     expect(tokens.radius).toBe("0.5rem");

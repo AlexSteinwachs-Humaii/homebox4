@@ -3,7 +3,7 @@
 @tailwind utilities;
 
 @layer base {
-  :root,.homebox {
+  .homebox, .theme-homebox {
     --background: 0 0% 100%;
     --background-accent: 0 0% 81%;
     --foreground: 0 0% 20%;
@@ -37,7 +37,7 @@
 }
 
   /* Warm cream surfaces and terracotta controls; foreground pairs meet WCAG AA. */
-  .theme-claude {
+  :root:not([data-theme]), .theme-claude {
     --background: 40 33% 96%;
     --background-accent: 35 25% 89%;
     --foreground: 30 8% 18%;
