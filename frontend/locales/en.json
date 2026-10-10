@@ -832,7 +832,16 @@
             "location_deleted": "Location deleted",
             "location_updated": "Location updated"
         },
-        "update_location": "Update Location"
+        "update_location": "Update Location",
+        "overview_description": "Find things by the places you keep them.",
+        "loading": "Loading your spaces…",
+        "load_failed": "Your spaces could not be loaded. Please try again.",
+        "retry": "Try again",
+        "your_spaces": "Your spaces",
+        "follow_trail": "Follow the location trail.",
+        "trail_help": "Expand the hierarchy to explore nested places. Item containers remain in the trail when they contain a place. Open a place to browse its contents.",
+        "illustration_help": "Location previews use a generic illustration, not uploaded photographs.",
+        "open_location": "Open {name}"
     },
     "maintenance": {
         "filter": {

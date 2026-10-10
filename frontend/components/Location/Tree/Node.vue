@@ -57,7 +57,7 @@
 <template>
   <div>
     <div
-      class="flex items-center gap-1 rounded p-1"
+      class="flex w-max min-w-full items-center gap-1 rounded p-1"
       :class="{
         'cursor-pointer hover:bg-accent hover:text-accent-foreground': hasChildren,
       }"
@@ -78,9 +78,9 @@
           </div>
         </div>
       </div>
-      <MdiMapMarker v-if="item.type === 'location'" class="size-4" />
-      <MdiPackageVariant v-else class="size-4" />
-      <NuxtLink class="text-lg hover:underline" :to="link" @click.stop>{{ item.name }} </NuxtLink>
+      <MdiMapMarker v-if="item.type === 'location'" class="size-4 shrink-0" />
+      <MdiPackageVariant v-else class="size-4 shrink-0" />
+      <NuxtLink class="whitespace-nowrap text-base hover:underline" :to="link" @click.stop>{{ item.name }} </NuxtLink>
     </div>
     <div v-if="openRef" class="ml-4">
       <LocationTreeNode
