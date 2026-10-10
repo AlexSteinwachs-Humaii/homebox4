@@ -1,0 +1,265 @@
+import { test, expect as baseExpect } from "@playwright/test";
+import type { Page } from "@playwright/test";
+import { overviewFixture } from "./overview-fixture";
+
+test.setTimeout(90000);
+test.use({ actionTimeout: 15000 });
+const expect = baseExpect.configure({ timeout: 30000 });
+
+// Deterministic error injection; these tests do not claim backend persistence.
+async function fixture(page: Page) {
+  await overviewFixture(page);
+  const state = {
+    creates: 0,
+    updates: 0,
+    rejectCreate: false,
+    rejectUpdate: false,
+    uncertain: false,
+    tenants: [] as string[],
+  };
+  await page.route("**/api/v1/entities/tree*", route =>
+    route.fulfill({
+      json: [{ id: "office", name: "Actual office", children: [] }],
+    })
+  );
+  await page.route(/\/api\/v1\/entities\?.*isLocation=true/, route =>
+    route.fulfill({
+      json: { items: [{ id: "office", name: "Actual office" }] },
+    })
+  );
+  await page.route("**/api/v1/entities", async route => {
+    if (route.request().method() !== "POST") return route.fallback();
+    state.creates++;
+    state.tenants.push(route.request().headers()["x-tenant"] ?? "missing");
+    if (state.uncertain) return route.abort("failed");
+    if (state.rejectCreate) return route.fulfill({ status: 422, json: { error: "rejected" } });
+    return route.fulfill({
+      status: 201,
+      json: {
+        ...route.request().postDataJSON(),
+        id: "captured",
+        entityType: { id: "item-type" },
+        parent: { id: "office" },
+        tags: [],
+        fields: [],
+      },
+    });
+  });
+  await page.route("**/api/v1/entities/captured", async route => {
+    if (route.request().method() !== "PUT")
+      return route.fulfill({
+        json: { id: "captured", name: "Recovery lamp", fields: [], tags: [], children: [], attachments: [] },
+      });
+    state.updates++;
+    state.tenants.push(route.request().headers()["x-tenant"] ?? "missing");
+    return route.fulfill(
+      state.rejectUpdate ? { status: 500, json: { error: "update failed" } } : { json: route.request().postDataJSON() }
+    );
+  });
+  await page.goto("/items/new?location=office");
+  await expect(page.getByRole("heading", { name: "Item information" })).toBeVisible();
+  return state;
+}
+async function fill(page: Page) {
+  await page.getByLabel("Name *", { exact: false }).fill("Recovery lamp");
+  await page.getByLabel("Description", { exact: false }).fill("Retained description");
+  await page.getByLabel("Purchased From", { exact: false }).fill("Real shop");
+  await page.getByLabel("Purchase price (USD)", { exact: true }).fill("0");
+}
+async function retained(page: Page) {
+  await expect(page.getByLabel("Name *", { exact: false })).toHaveValue("Recovery lamp");
+  await expect(page.getByLabel("Description", { exact: false })).toHaveValue("Retained description");
+  await expect(page.getByLabel("Purchased From", { exact: false })).toHaveValue("Real shop");
+  await expect(page.getByLabel("Purchase price (USD)", { exact: true })).toHaveValue("0");
+}
+
+test("validation and rejected create retain input; Cancel before save makes no writes", async ({ page }) => {
+  const state = await fixture(page);
+  await fill(page);
+  // Whitespace passes native required but must fail domain validation.
+  await page.getByLabel("Name *", { exact: false }).fill("   ");
+  await page.getByRole("button", { name: "Save item", exact: true }).click();
+  await expect(page.getByRole("alert")).toBeVisible();
+  expect(state.creates).toBe(0);
+  await fill(page);
+  state.rejectCreate = true;
+  await page.getByRole("button", { name: "Save item", exact: true }).click();
+  await expect(page.getByRole("alert")).toContainText("422");
+  await retained(page);
+  expect(state.updates).toBe(0);
+  await page.getByRole("button", { name: "Cancel", exact: true }).click();
+  await expect(page).toHaveURL(/\/items$/);
+  const writes = state.creates;
+  await page.goto("/items/new?location=office");
+  await fill(page);
+  await page.getByRole("button", { name: "Cancel", exact: true }).click();
+  await expect(page).toHaveURL(/\/items$/);
+  expect(state.creates).toBe(writes);
+});
+
+test("double submission and supplemental retry target one identity only", async ({ page }) => {
+  const state = await fixture(page);
+  await fill(page);
+  state.rejectUpdate = true;
+  // Two synchronous submit events exercise the handler guard independently of button disabling.
+  await page
+    .locator("form")
+    .filter({ has: page.getByRole("heading", { name: "Item information" }) })
+    .evaluate(form => {
+      form.dispatchEvent(new Event("submit", { bubbles: true, cancelable: true }));
+      form.dispatchEvent(new Event("submit", { bubbles: true, cancelable: true }));
+    });
+  await expect(page.getByRole("alert")).toContainText("500");
+  await retained(page);
+  expect(state.creates).toBe(1);
+  expect(state.updates).toBe(1);
+  await expect(page.getByRole("alert").getByRole("link")).toHaveAttribute("href", "/item/captured");
+  state.rejectUpdate = false;
+  await page.getByRole("button", { name: /Retry/ }).click();
+  await expect(page).toHaveURL(/\/item\/captured$/);
+  expect(state.creates).toBe(1);
+  expect(state.updates).toBe(2);
+  expect(state.tenants).toEqual(["a", "a", "a"]);
+});
+
+test("uncertain create preserves values and prevents another POST", async ({ page }) => {
+  const state = await fixture(page);
+  state.uncertain = true;
+  await fill(page);
+  await page.getByRole("button", { name: "Save item", exact: true }).click();
+  await expect(page.getByRole("alert")).toContainText("could not confirm");
+  await retained(page);
+  await expect(page.getByRole("button", { name: "Save item", exact: true })).toBeDisabled();
+  await page
+    .locator("form")
+    .filter({ has: page.getByRole("heading", { name: "Item information" }) })
+    .evaluate(form => form.dispatchEvent(new Event("submit", { bubbles: true, cancelable: true })));
+  expect(state.creates).toBe(1);
+  expect(state.updates).toBe(0);
+});
+
+test("collection switch discards partial identity and entered values", async ({ page }) => {
+  const state = await fixture(page);
+  state.rejectUpdate = true;
+  await fill(page);
+  await page.getByRole("button", { name: "Save item", exact: true }).click();
+  await expect(page.getByRole("alert")).toContainText("500");
+  await page
+    .getByRole("combobox", {
+      name: "Select Collection: First collection",
+      exact: true,
+    })
+    .first()
+    .click();
+  await page.getByRole("option", { name: "Second collection" }).click();
+  await expect(page.getByLabel("Name *", { exact: false })).toHaveValue("");
+  await expect(page.getByRole("button", { name: "Save item", exact: true })).toBeVisible();
+  await expect(page.getByRole("link", { name: /captured/ })).toHaveCount(0);
+  expect(state.tenants).toEqual(["a", "a"]);
+});
+
+// Live API tests intentionally do not use overviewFixture or intercept entity responses.
+for (const entry of ["/home", "/items"]) {
+  test(`live capture from ${entry} persists core and purchase values through navigation and reload`, async ({
+    page,
+    request,
+  }) => {
+    await page.addInitScript(() =>
+      localStorage.setItem("homebox/preferences/location", JSON.stringify({ theme: "warm-habitat", language: "en" }))
+    );
+    const email = `capture-${crypto.randomUUID()}@example.com`;
+    const password = "CaptureJourney!2026";
+    const registration = await request.post("/api/v1/users/register", {
+      data: { email, name: "Capture tester", password },
+    });
+    expect(registration.status()).toBe(204);
+    await page.goto("/");
+    await page.fill("input[type='text']", email);
+    await page.fill("input[type='password']", password);
+    await page.click("button[type='submit']");
+    await expect(page).toHaveURL(/\/home$/);
+    const typesResponse = await page.request.get("/api/v1/entity-types");
+    expect(typesResponse.ok()).toBe(true);
+    const types = await typesResponse.json();
+    const locationResponse = await page.request.post("/api/v1/entities", {
+      data: {
+        name: "Journey office",
+        description: "",
+        quantity: 1,
+        entityTypeId: types.find((type: { isLocation: boolean }) => type.isLocation).id,
+        tagIds: [],
+      },
+    });
+    expect(locationResponse.status()).toBe(201);
+    const location = await locationResponse.json();
+    const tagResponse = await page.request.post("/api/v1/tags", {
+      data: { name: "Journey lighting", description: "", color: "#123456", icon: "" },
+    });
+    expect(tagResponse.status()).toBe(201);
+    const tag = await tagResponse.json();
+    await page.goto(entry);
+    await page.getByRole("button", { name: "Add an item", exact: true }).first().click();
+    await expect(page).toHaveURL(/\/items\/new$/);
+    await expect(page.getByRole("heading", { name: "Inventory", exact: true })).toHaveCount(0);
+    await page.getByLabel("Name *", { exact: false }).fill("Persistent journey lamp");
+    await page.getByRole("combobox", { name: "Parent Location", exact: true }).click();
+    await page.getByRole("option", { name: /Journey office/ }).click();
+    await page.getByLabel("Quantity", { exact: true }).fill("2.5");
+    await page.getByLabel("Description", { exact: false }).fill("Persistent core description");
+    await page.getByLabel("Purchased From", { exact: false }).fill("Journey store");
+    await page.getByLabel(/Purchase price/).fill("0");
+    await page.getByLabel("Insured", { exact: true }).click();
+    await page.getByPlaceholder("Select Tags").fill("Journey lighting");
+    await page.getByRole("option", { name: "Journey lighting", exact: true }).click();
+    await page.getByLabel("Name *", { exact: false }).click();
+    const dateInput = page.locator(".dp__input");
+    await dateInput.click();
+    await page.locator(".dp__today").click();
+    await page.getByRole("button", { name: "Select", exact: true }).click();
+    const localDate = await page.evaluate(() => {
+      const now = new Date();
+      return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}`;
+    });
+    const created = page.waitForResponse(
+      response => response.url().endsWith("/api/v1/entities") && response.request().method() === "POST"
+    );
+    await page.getByRole("button", { name: "Save item", exact: true }).dblclick();
+    const record = await (await created).json();
+    await expect(page).toHaveURL(new RegExp(`/item/${record.id}$`));
+    await page.getByRole("link", { name: "Back to Inventory", exact: true }).click();
+    await expect(page).toHaveURL(/\/items$/);
+    await page.locator(`a[href='/item/${record.id}']`).getByRole("heading").click();
+    await expect(page).toHaveURL(new RegExp(`/item/${record.id}$`));
+    await page.reload();
+    await expect(
+      page.getByRole("heading", {
+        name: "Persistent journey lamp",
+        exact: true,
+      })
+    ).toBeVisible();
+    await expect(page.getByText("Persistent core description", { exact: true })).toBeVisible();
+    await expect(page.getByText("Journey store", { exact: true })).toBeVisible();
+    const persistedResponse = await page.request.get(`/api/v1/entities/${record.id}`);
+    expect(persistedResponse.ok()).toBe(true);
+    const persisted = await persistedResponse.json();
+    expect(persisted).toMatchObject({
+      name: "Persistent journey lamp",
+      quantity: 2.5,
+      description: "Persistent core description",
+      purchasePrice: 0,
+      purchaseFrom: "Journey store",
+      purchaseDate: localDate,
+      insured: true,
+      parent: { id: location.id },
+      entityType: { id: types.find((type: { isLocation: boolean }) => !type.isLocation).id },
+      tags: [{ id: tag.id }],
+    });
+    const rows = page.locator("dl > div");
+    await expect(rows.filter({ hasText: "Quantity" }).locator("dd")).toHaveText("2.5");
+    await expect(rows.filter({ hasText: "Insured" }).locator("dd")).toHaveText("Yes");
+    await expect(page.getByText("Journey lighting", { exact: true })).toBeVisible();
+    const listing = await (await page.request.get("/api/v1/entities?q=Persistent%20journey%20lamp")).json();
+    expect(listing.items.filter((item: { id: string }) => item.id === record.id)).toHaveLength(1);
+    expect(listing.items).toHaveLength(1);
+  });
+}

@@ -38,7 +38,7 @@ const record = {
   updatedAt: "2026-10-09",
   itemCount: 0,
   totalPrice: 0,
-} as EntityOut;
+} as unknown as EntityOut;
 const options = {
   types: [{ id: "type", isLocation: false }] as EntityTypeSummary[],
   locations: [{ id: "place" }],
@@ -247,6 +247,32 @@ describe("item capture persistence", () => {
     expect(capture.entity.value).toBeNull();
     scope.stop();
   });
+
+  it.each(["entityTypeId", "location", "tagIds"])(
+    "rejects unauthorized %s before any write, including partial retry",
+    async field => {
+      const { capture, create, update, scope } = setup();
+      const input = form();
+      if (field === "entityTypeId") input.entityTypeId = "foreign-type";
+      if (field === "location") input.location = { id: "foreign-place" } as EntitySummary;
+      if (field === "tagIds") input.tagIds = ["foreign-tag"];
+      const original = structuredClone(input);
+      await capture.save(input, options);
+      expect(capture.errors.value).toContain(field);
+      expect(input).toEqual(original);
+      expect(create).not.toHaveBeenCalled();
+      expect(update).not.toHaveBeenCalled();
+      update.mockResolvedValueOnce(response(true));
+      await capture.save(form(), options);
+      expect(capture.stage.value).toBe("partial");
+      await capture.save(input, options);
+      expect(capture.errors.value).toContain(field);
+      expect(create).toHaveBeenCalledTimes(1);
+      expect(update).toHaveBeenCalledTimes(1);
+      expect(capture.entity.value?.id).toBe("real-id");
+      scope.stop();
+    }
+  );
 
   it("cannot reuse a partial identity in another tenant", async () => {
     const { capture, create, update, collection, scope } = setup();
