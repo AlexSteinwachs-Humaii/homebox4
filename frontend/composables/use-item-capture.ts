@@ -3,6 +3,8 @@ import type { ItemsApi } from "../lib/api/classes/items";
 import type { EntityOut, EntityUpdate } from "../lib/api/types/data-contracts";
 import { validateItemForm, type ItemFormData } from "../lib/items/item-form";
 
+import { creationReceipt } from "../lib/items/creation-receipt";
+
 type Options = Parameters<typeof validateItemForm>[1];
 export type CaptureStage = "idle" | "invalid" | "create_failed" | "uncertain" | "partial" | "saved";
 
@@ -53,6 +55,7 @@ export function useItemCapture(
     collectionId,
     () => {
       generation++;
+      creationReceipt.clear();
       pending.value = false;
       stage.value = "idle";
       entity.value = null;
@@ -65,6 +68,8 @@ export function useItemCapture(
 
   async function save(input: ItemFormData, options: Options): Promise<string | null> {
     if (pending.value || !collectionId.value || stage.value === "uncertain" || stage.value === "saved") return null;
+    creationReceipt.clear();
+    const tenant = collectionId.value;
     errors.value = validateItemForm(input, options);
     if (errors.value.length) {
       stage.value = entity.value ? "partial" : "invalid";
@@ -113,7 +118,9 @@ export function useItemCapture(
           status.value = result.status;
           return null;
         }
+        entity.value = result.data;
         stage.value = "saved";
+        creationReceipt.publish(tenant, entity.value!.id);
         return entity.value!.id;
       } catch {
         // PUT targets a known identity and can safely be retried, unlike POST.

@@ -43,6 +43,8 @@
   import DetailsSection from "~/components/global/DetailsSection/DetailsSection.vue";
   import ItemAttachmentsList from "~/components/Item/AttachmentsList.vue";
   import ItemDetails from "~/components/WarmHabitat/ItemDetails.vue";
+  import SavedItemConfirmation from "~/components/WarmHabitat/SavedItemConfirmation.vue";
+  import { creationReceipt } from "~/lib/items/creation-receipt";
   import ItemViewSelectable from "~/components/Item/View/Selectable.vue";
 
   const { t } = useI18n();
@@ -79,11 +81,14 @@
   const loading = ref(false);
   const failed = ref(false);
   const items = ref<EntitySummary[]>([]);
+  const showSavedConfirmation = ref(false);
   let loadVersion = 0;
 
   async function refresh() {
     const version = ++loadVersion;
     const id = itemId.value;
+    const hasReceipt = creationReceipt.take(preferences.value.collectionId, id);
+    showSavedConfirmation.value = false;
     item.value = undefined;
     fullpath.value = [];
     items.value = [];
@@ -99,6 +104,7 @@
         return;
       }
       item.value = data;
+      showSavedConfirmation.value = hasReceipt;
       const path = await client.items.fullpath(id);
       if (version === loadVersion && !path.error) fullpath.value = path.data;
       if (version === loadVersion) await refreshItemList();
@@ -558,6 +564,7 @@
       <NuxtLink to="/items" class="mb-4 inline-block text-primary underline">
         {{ $t("items.back_to_inventory") }}
       </NuxtLink>
+      <SavedItemConfirmation v-if="showSavedConfirmation && !hasNested" :item="item" />
       <Card class="p-3">
         <header :class="{ 'mb-2': item.description }">
           <div class="flex flex-wrap items-end gap-2">

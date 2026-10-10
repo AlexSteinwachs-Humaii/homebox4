@@ -1,6 +1,7 @@
 import { effectScope, ref } from "vue";
 import { describe, expect, it, vi } from "vitest";
 import { captureUpdate, useItemCapture } from "./use-item-capture";
+import { creationReceipt } from "../lib/items/creation-receipt";
 import { emptyItemForm } from "../lib/items/item-form";
 import type { EntityOut, EntitySummary, EntityTypeSummary, TagOut } from "../lib/api/types/data-contracts";
 import type { ItemsApi } from "../lib/api/classes/items";
@@ -60,6 +61,7 @@ function response(error = false, status = error ? 400 : 200, data = record) {
   return { error, status, data, response: new Response(null, { status }) };
 }
 function setup() {
+  creationReceipt.clear();
   const scope = effectScope();
   const collection = ref<string | null>("tenant");
   const create = vi.fn<ItemsApi["create"]>().mockResolvedValue(response());
@@ -96,6 +98,8 @@ describe("item capture persistence", () => {
       })
     );
     expect(capture.stage.value).toBe("saved");
+    expect(creationReceipt.take("tenant", "real-id")).toBe(true);
+    expect(creationReceipt.take("tenant", "real-id")).toBe(false);
     await capture.save(input, options);
     expect(create).toHaveBeenCalledTimes(1);
     expect(update).toHaveBeenCalledTimes(1);
@@ -125,6 +129,7 @@ describe("item capture persistence", () => {
     expect(await capture.save(input, options)).toBeNull();
     expect(capture.entity.value?.id).toBe("real-id");
     expect(capture.stage.value).toBe("partial");
+    expect(creationReceipt.take("tenant", "real-id")).toBe(false);
     expect(input).toEqual(form());
     input.purchaseFrom = "Corrected shop";
     input.name = "Corrected name";
@@ -173,6 +178,7 @@ describe("item capture persistence", () => {
     await Promise.resolve();
     expect(capture.pending.value).toBe(true);
     expect(capture.stage.value).toBe("partial");
+    expect(creationReceipt.take("tenant", "real-id")).toBe(false);
     expect(await capture.save(form(), options)).toBeNull();
     expect(create).toHaveBeenCalledTimes(1);
     finish(response());
@@ -191,6 +197,7 @@ describe("item capture persistence", () => {
     create.mockResolvedValueOnce(response(true, 422));
     await capture.save(input, options);
     expect(capture.stage.value).toBe("create_failed");
+    expect(creationReceipt.take("tenant", "real-id")).toBe(false);
     expect(input).toEqual(form());
     expect(update).not.toHaveBeenCalled();
     expect(await capture.save(input, options)).toBe("real-id");
@@ -205,6 +212,7 @@ describe("item capture persistence", () => {
     const input = form();
     await capture.save(input, options);
     expect(capture.stage.value).toBe("uncertain");
+    expect(creationReceipt.take("tenant", "real-id")).toBe(false);
     expect(input).toEqual(form());
     await capture.save(input, options);
     expect(create).toHaveBeenCalledTimes(1);

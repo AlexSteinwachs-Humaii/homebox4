@@ -498,6 +498,8 @@
         "retry": "Retry"
     },
     "capture": {
+        "saved_title": "Item saved",
+        "saved_message": "{name} has been added to your collection. Its recorded details are shown below.",
         "subtitle": "Give your new possession a place in your collection.",
         "item_information": "Item information",
         "name_required": "Name *",

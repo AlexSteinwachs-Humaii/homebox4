@@ -14,6 +14,7 @@ async function fixture(page: Page) {
     updates: 0,
     rejectCreate: false,
     rejectUpdate: false,
+    rejectRead: false,
     uncertain: false,
     tenants: [] as string[],
   };
@@ -45,16 +46,24 @@ async function fixture(page: Page) {
       },
     });
   });
+  let persisted = { id: "captured", name: "Recovery lamp", fields: [], tags: [], children: [], attachments: [] };
   await page.route("**/api/v1/entities/captured", async route => {
-    if (route.request().method() !== "PUT")
-      return route.fulfill({
-        json: { id: "captured", name: "Recovery lamp", fields: [], tags: [], children: [], attachments: [] },
-      });
+    if (route.request().method() !== "PUT") {
+      if (state.rejectRead) return route.fulfill({ status: 403, json: { error: "forbidden" } });
+      return route.fulfill({ json: persisted });
+    }
     state.updates++;
     state.tenants.push(route.request().headers()["x-tenant"] ?? "missing");
-    return route.fulfill(
-      state.rejectUpdate ? { status: 500, json: { error: "update failed" } } : { json: route.request().postDataJSON() }
-    );
+    if (state.rejectUpdate) return route.fulfill({ status: 500, json: { error: "update failed" } });
+    persisted = {
+      ...persisted,
+      ...route.request().postDataJSON(),
+      // Canonical read data can differ from input; the confirmation must use this.
+      name: "Recorded lamp",
+      parent: { id: "office", name: "Actual office" },
+      tags: [{ id: "tag", name: "Recorded tag" }],
+    };
+    return route.fulfill({ json: persisted });
   });
   await page.goto("/items/new?location=office");
   await expect(page.getByRole("heading", { name: "Item information" })).toBeVisible();
@@ -156,6 +165,47 @@ test("collection switch discards partial identity and entered values", async ({ 
   await expect(page.getByRole("button", { name: "Save item", exact: true })).toBeVisible();
   await expect(page.getByRole("link", { name: /captured/ })).toHaveCount(0);
   expect(state.tenants).toEqual(["a", "a"]);
+});
+
+test("saved confirmation uses authorized recorded values and cannot be replayed by URL or reload", async ({ page }) => {
+  await fixture(page);
+  await fill(page);
+  await page.getByRole("button", { name: "Save item", exact: true }).click();
+  await expect(page).toHaveURL(/\/item\/captured$/);
+  await expect(page.getByRole("status", { name: "Item saved", exact: true })).toContainText("Recorded lamp");
+  await expect(page.getByRole("heading", { name: "Recorded lamp", exact: true })).toBeVisible();
+  await expect(page.getByText("Real shop", { exact: true })).toBeVisible();
+  await expect(page.getByText("Retained description", { exact: true })).toBeVisible();
+  await expect(page.getByText("Recorded tag", { exact: true })).toBeVisible();
+  await page.reload();
+  await expect(page.getByRole("heading", { name: "Recorded lamp", exact: true })).toBeVisible();
+  await expect(page.getByRole("status", { name: "Item saved", exact: true })).toHaveCount(0);
+  await page.goto("/item/captured?saved=true");
+  await expect(page.getByRole("heading", { name: "Recorded lamp", exact: true })).toBeVisible();
+  await expect(page.getByRole("status", { name: "Item saved", exact: true })).toHaveCount(0);
+});
+
+test("partial save and unauthorized confirmation fetch cannot show success", async ({ page }) => {
+  const state = await fixture(page);
+  await fill(page);
+  state.rejectUpdate = true;
+  await page.getByRole("button", { name: "Save item", exact: true }).click();
+  await expect(page.getByRole("alert")).toContainText("500");
+  await page.getByRole("alert").getByRole("link").click();
+  await expect(page.getByRole("heading", { name: "Recovery lamp", exact: true })).toBeVisible();
+  await expect(page.getByRole("status", { name: "Item saved", exact: true })).toHaveCount(0);
+  await page.goto("/items/new?location=office");
+  await fill(page);
+  state.rejectUpdate = false;
+  state.rejectRead = true;
+  await page.getByRole("button", { name: "Save item", exact: true }).click();
+  await expect(page).toHaveURL(/\/item\/captured$/);
+  await expect(page.getByRole("alert")).toBeVisible();
+  await expect(page.getByRole("status", { name: "Item saved", exact: true })).toHaveCount(0);
+  state.rejectRead = false;
+  await page.reload();
+  await expect(page.getByRole("heading", { name: "Recorded lamp", exact: true })).toBeVisible();
+  await expect(page.getByRole("status", { name: "Item saved", exact: true })).toHaveCount(0);
 });
 
 // Live API tests intentionally do not use overviewFixture or intercept entity responses.
