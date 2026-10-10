@@ -581,7 +581,7 @@
 <template>
   <Feedback v-if="resource.error.value" :title="t('items.toast.failed_load_item')" />
   <div v-else-if="!item" class="py-8" role="status">
-    {{ $t("capture.loading") }}
+    {{ $t("edit_form.loading") }}
   </div>
   <div v-else class="space-y-6 pb-8">
     <ItemContext :title="t('edit_form.title', { name: loadedItem?.name })" :description="t('edit_form.subtitle')">
@@ -849,7 +849,7 @@
               {{ $t("items.attachments") }}
             </h3>
             <p class="text-xs">
-              {{ $t("items.changes_persisted_immediately") }}
+              {{ $t("edit_form.attachments_on_save") }}
             </p>
           </div>
           <div class="border-t p-4">

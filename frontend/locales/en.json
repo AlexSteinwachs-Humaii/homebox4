@@ -10,6 +10,8 @@
         "save_rejected": "Save failed (status {status}). Your draft is still here. Review and correct the field values, then try Save again.",
         "attachments_failed": "Item values were saved, but an attachment change failed. Remaining changes are still here. Check your connection or access, then try Save again.",
         "pending_attachments": "Attachment changes waiting for Save:",
+        "attachments_on_save": "Attachment changes are saved with the item. Cancel leaves them unsaved.",
+        "loading": "Loading item…",
         "validation": {
             "name": "Enter a name of 1–255 bytes.",
             "entityTypeId": "Select an entity type.",

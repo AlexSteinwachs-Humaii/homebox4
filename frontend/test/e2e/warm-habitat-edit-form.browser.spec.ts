@@ -115,6 +115,8 @@ test("edit loads actual grouped values, nested parent and immutable purchase con
   ).toHaveValue("Real warranty");
   await expect(page.getByRole("textbox", { name: /^Value/ })).toHaveValue("35mm");
   await expect(page.getByRole("heading", { name: "Attachments", exact: true })).toBeVisible();
+  await expect(page.getByText("Attachment changes are saved with the item. Cancel leaves them unsaved.")).toBeVisible();
+  await expect(page.getByText("Changes to attachments will be saved immediately")).toHaveCount(0);
   expect(state.writes).toEqual([]);
 });
 
