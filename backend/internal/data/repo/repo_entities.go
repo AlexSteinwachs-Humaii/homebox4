@@ -777,6 +777,10 @@ func (r *EntityRepository) QueryByGroup(ctx context.Context, gid uuid.UUID, q En
 		qb = qb.Order(ent.Asc(entity.FieldName))
 	}
 
+	// Names and timestamps can tie; a unique secondary key keeps lifecycle
+	// pagination stable so assets are neither repeated nor skipped across pages.
+	qb = qb.Order(ent.Asc(entity.FieldID))
+
 	qb = qb.
 		WithTag().
 		WithParent().

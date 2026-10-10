@@ -205,6 +205,7 @@
 
   watch(includeArchived, (newV, oldV) => {
     if (newV !== oldV) {
+      page.value = 1;
       search();
     }
   });
@@ -270,11 +271,15 @@
     return data;
   }
 
+  let searchVersion = 0;
   async function search() {
     if (searchLocked.value || route.path !== "/items") {
       return;
     }
 
+    // A slower response for an earlier lifecycle/page must not replace the
+    // results and counts for the currently selected inventory filter.
+    const version = ++searchVersion;
     loading.value = true;
 
     const fields = [];
@@ -321,6 +326,7 @@
     }
 
     await router.push({ query: push_query as LocationQueryRaw });
+    if (version !== searchVersion || searchLocked.value || route.path !== "/items") return;
 
     const { data, error } = await api.items.getAll({
       q: query.value || "",
@@ -337,7 +343,7 @@
       fields,
     });
 
-    if (searchLocked.value || route.path !== "/items") return;
+    if (version !== searchVersion || searchLocked.value || route.path !== "/items") return;
 
     function resetItems() {
       page.value = Math.max(1, page.value - 1);
@@ -352,13 +358,13 @@
       return;
     }
 
-    if (!data.items || data.items.length === 0) {
-      resetItems();
-      return;
-    }
-
+    // Keep the server's filtered total even when this page is empty (for
+    // example after an asset is offboarded while viewing the last page).
     total.value = data.total;
-    items.value = data.items;
+    items.value = data.items ?? [];
+    if (items.value.length === 0 && page.value > 1) {
+      page.value = Math.max(1, Math.ceil(data.total / pageSize.value));
+    }
 
     loading.value = false;
     initialSearch.value = false;
