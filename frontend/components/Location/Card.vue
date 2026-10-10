@@ -2,6 +2,7 @@
   <Card v-if="overview" class="overflow-hidden">
     <NuxtLink
       :to="`/location/${location.id}`"
+      :aria-label="$t('locations.open_location', { name: location.name })"
       class="block transition hover:bg-accent focus-visible:outline focus-visible:outline-2 focus-visible:outline-ring"
     >
       <div class="flex h-44 items-center justify-center bg-muted" aria-hidden="true">

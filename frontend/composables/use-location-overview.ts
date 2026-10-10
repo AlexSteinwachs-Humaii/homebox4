@@ -10,7 +10,7 @@ export function locationBranches(items: TreeItem[]): TreeItem[] {
   });
 }
 
-export function useLocationOverview(collectionId: Ref<string | null | undefined>, api: ItemsApi) {
+export function useLocationOverview(collectionId: Ref<string | null | undefined>, api: ItemsApi | (() => ItemsApi)) {
   const roots = ref<EntitySummary[]>([]);
   const tree = ref<TreeItem[]>([]);
   const loading = ref(false);
@@ -25,9 +25,10 @@ export function useLocationOverview(collectionId: Ref<string | null | undefined>
     loading.value = !!collectionId.value;
     if (!collectionId.value) return;
     try {
+      const client = typeof api === "function" ? api() : api;
       const [places, hierarchy] = await Promise.all([
-        api.getLocations({ filterChildren: true }),
-        api.getTree({ withItems: true }),
+        client.getLocations({ filterChildren: true }),
+        client.getTree({ withItems: true }),
       ]);
       if (request !== generation) return;
       if (places.error || hierarchy.error) throw new Error("Locations request failed");

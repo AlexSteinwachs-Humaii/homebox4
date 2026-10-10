@@ -46,8 +46,8 @@
       </Button>
     </div>
 
-    <ul role="tree" :aria-labelledby="treeId" class="space-y-1">
-      <li v-for="item in sortedLocs" :key="item.id" role="treeitem">
+    <ul :aria-labelledby="treeId" class="space-y-1">
+      <li v-for="item in sortedLocs" :key="item.id">
         <LocationTreeNode :item="item" :tree-id="treeId" :show-items="props.showItems ?? true" />
       </li>
     </ul>

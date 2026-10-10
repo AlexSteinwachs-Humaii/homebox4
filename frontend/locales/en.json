@@ -833,6 +833,8 @@
             "location_updated": "Location updated"
         },
         "update_location": "Update Location",
+        "expand_location": "Expand {name}",
+        "collapse_location": "Collapse {name}",
         "overview_description": "Find things by the places you keep them.",
         "loading": "Loading your spaces…",
         "load_failed": "Your spaces could not be loaded. Please try again.",

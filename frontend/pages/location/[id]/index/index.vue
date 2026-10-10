@@ -3,7 +3,7 @@
   import { toast } from "@/components/ui/sonner";
   import type { AnyDetail, Details } from "~~/components/global/DetailsSection/types";
   import { filterZeroValues } from "~~/components/global/DetailsSection/types";
-  import type { ItemAttachment } from "~~/lib/api/types/data-contracts";
+  import type { EntityOut, EntityPath, EntitySummary, ItemAttachment } from "~~/lib/api/types/data-contracts";
   import MdiPackageVariant from "~icons/mdi/package-variant";
   import MdiPlus from "~icons/mdi/plus";
   import MdiPencil from "~icons/mdi/pencil";
@@ -43,21 +43,52 @@
   const { openDialog } = useDialog();
 
   const route = useRoute();
-  const api = useUserApi();
   const preferences = useViewPreferences();
-
-  const locationId = computed<string>(() => route.params.id as string);
-
-  const { data: location } = useAsyncData(locationId.value, async () => {
-    const { data, error } = await api.items.getLocation(locationId.value);
-    if (error) {
-      toast.error(t("locations.toast.failed_load_location"));
-      navigateTo("/home");
-      return;
-    }
-
-    return data;
+  const { selectedCollection } = useCollections();
+  const api = computed(() => {
+    void preferences.value.collectionId;
+    return useUserApi();
   });
+  const locationId = computed<string>(() => route.params.id as string);
+  const location = ref<EntityOut>();
+  const items = ref<EntitySummary[]>([]);
+  const fullpath = ref<EntityPath[]>([]);
+  const loading = ref(false);
+  const failed = ref(false);
+  let generation = 0;
+
+  async function refreshItemList() {
+    const request = ++generation;
+    location.value = undefined;
+    items.value = [];
+    fullpath.value = [];
+    failed.value = false;
+    loading.value = !!preferences.value.collectionId;
+    if (!preferences.value.collectionId) return;
+    const client = api.value.items;
+    const id = locationId.value;
+    try {
+      const record = await client.getLocation(id);
+      if (request !== generation) return;
+      if (record.error) throw new Error("Location unavailable");
+      const [contents, path] = await Promise.all([client.getAll({ parentIds: [id] }), client.fullpath(id)]);
+      if (request !== generation) return;
+      if (contents.error || path.error) throw new Error("Location contents unavailable");
+      location.value = record.data;
+      items.value = contents.data.items;
+      fullpath.value = path.data;
+    } catch {
+      if (request === generation) failed.value = true;
+    } finally {
+      if (request === generation) loading.value = false;
+    }
+  }
+
+  watch([locationId, () => preferences.value.collectionId], refreshItemList, {
+    immediate: true,
+    flush: "sync",
+  });
+  onScopeDispose(() => generation++);
 
   const confirm = useConfirm();
 
@@ -67,7 +98,7 @@
       return;
     }
 
-    const { error } = await api.items.deleteLocation(locationId.value);
+    const { error } = await api.value.items.deleteLocation(locationId.value);
     if (error) {
       toast.error(t("locations.toast.failed_delete_location"));
       return;
@@ -104,12 +135,12 @@
     return location.value.attachments.reduce((acc, cur) => {
       if (cur.type === "photo") {
         const photo: Photo = {
-          originalSrc: api.authURL(`/entities/${location.value!.id}/attachments/${cur.id}`),
+          originalSrc: api.value.authURL(`/entities/${location.value!.id}/attachments/${cur.id}`),
           originalType: cur.mimeType,
           attachmentId: cur.id,
         };
         if (cur.thumbnail) {
-          photo.thumbnailSrc = api.authURL(`/entities/${location.value!.id}/attachments/${cur.thumbnail.id}`);
+          photo.thumbnailSrc = api.value.authURL(`/entities/${location.value!.id}/attachments/${cur.thumbnail.id}`);
         } else {
           photo.thumbnailSrc = photo.originalSrc;
         }
@@ -191,36 +222,21 @@
 
     return ret;
   });
-
-  const { data: items, refresh: refreshItemList } = useAsyncData(
-    () => locationId.value + "_item_list",
-    async () => {
-      if (!locationId.value) {
-        return [];
-      }
-
-      const resp = await api.items.getAll({
-        parentIds: [locationId.value],
-      });
-
-      if (resp.error) {
-        toast.error(t("items.toast.failed_load_items"));
-        return [];
-      }
-
-      return resp.data.items;
-    },
-    {
-      watch: [locationId],
-    }
-  );
 </script>
 
 <template>
   <div>
     <ItemImageDialog />
 
-    <div v-if="location">
+    <p class="mb-4 text-sm text-muted-foreground">
+      {{ selectedCollection?.name }}
+    </p>
+    <BaseCard v-if="loading" class="p-6" role="status">{{ $t("locations.loading") }}</BaseCard>
+    <BaseCard v-else-if="failed" class="p-6" role="alert">
+      <p>{{ $t("locations.toast.failed_load_location") }}</p>
+      <Button class="mt-3" variant="outline" @click="refreshItemList">{{ $t("locations.retry") }}</Button>
+    </BaseCard>
+    <div v-else-if="location">
       <!-- set page title -->
       <Title>{{ location.name }}</Title>
 
@@ -251,17 +267,25 @@
               <MdiPackageVariant class="size-7" />
             </div>
             <div>
-              <Breadcrumb v-if="location?.parent">
+              <Breadcrumb>
                 <BreadcrumbList>
                   <BreadcrumbItem>
-                    <BreadcrumbLink as-child class="text-foreground/70 hover:underline">
-                      <NuxtLink :to="`/location/${location.parent.id}`">
-                        {{ location.parent.name }}
-                      </NuxtLink>
+                    <BreadcrumbLink as-child>
+                      <NuxtLink to="/locations">{{ $t("menu.locations") }}</NuxtLink>
                     </BreadcrumbLink>
                   </BreadcrumbItem>
+                  <template v-for="entry in fullpath.filter(entry => entry.id !== locationId)" :key="entry.id">
+                    <BreadcrumbSeparator />
+                    <BreadcrumbItem>
+                      <BreadcrumbLink as-child class="text-foreground/70 hover:underline">
+                        <NuxtLink :to="`/${entry.type === 'location' ? 'location' : 'item'}/${entry.id}`">
+                          {{ entry.name }}
+                        </NuxtLink>
+                      </BreadcrumbLink>
+                    </BreadcrumbItem>
+                  </template>
                   <BreadcrumbSeparator />
-                  <BreadcrumbItem> {{ location.name }} </BreadcrumbItem>
+                  <BreadcrumbItem>{{ location.name }}</BreadcrumbItem>
                 </BreadcrumbList>
               </Breadcrumb>
               <h1 class="flex items-center gap-3 pb-1 text-2xl">
@@ -348,7 +372,9 @@
 
       <!-- Child locations -->
       <section v-if="location && location.children && location.children.length > 0" class="mt-6">
-        <BaseSectionHeader class="mb-5"> {{ $t("locations.child_locations") }} </BaseSectionHeader>
+        <BaseSectionHeader class="mb-5">
+          {{ $t("locations.child_locations") }}
+        </BaseSectionHeader>
         <div class="grid grid-cols-1 gap-2 sm:grid-cols-3">
           <LocationCard v-for="child in location.children" :key="child.id" :location="child" />
         </div>

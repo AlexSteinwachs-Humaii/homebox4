@@ -27,12 +27,10 @@
     title: "HomeBox | " + t("menu.locations"),
   });
 
-  const api = useUserApi();
-
   const prefs = useViewPreferences();
   const { selectedCollection } = useCollections();
   const collectionId = computed(() => prefs.value.collectionId);
-  const { roots, tree, loading, failed, refresh } = useLocationOverview(collectionId, api.items);
+  const { roots, tree, loading, failed, refresh } = useLocationOverview(collectionId, () => useUserApi().items);
   onServerEvent(ServerEvent.EntityMutation, () => void refresh());
 
   const locationTreeId = "locationTree";
@@ -104,7 +102,7 @@
   function openItemChildren(items: TreeItem[]) {
     for (const item of items) {
       if (item.children.length > 0) {
-        treeState.value[item.id.replace(/-/g, "").substring(0, 8)] = true;
+        treeState.value[item.id] = true;
         openItemChildren(item.children);
       }
     }

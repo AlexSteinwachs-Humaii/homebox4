@@ -20,6 +20,27 @@ function setup(getLocations = vi.fn().mockResolvedValue(result([])), getTree = v
 }
 
 describe("collection location overview", () => {
+  it("resolves a fresh collection-bound API client for every refresh", async () => {
+    const collection = ref<string | null>("a");
+    const tenants: string[] = [];
+    const scope = effectScope();
+    const state = scope.run(() =>
+      useLocationOverview(collection, () => {
+        const tenant = collection.value!;
+        tenants.push(tenant);
+        return {
+          getLocations: vi.fn().mockResolvedValue(result([{ id: tenant, name: tenant }])),
+          getTree: vi.fn().mockResolvedValue(result([])),
+        } as unknown as ItemsApi;
+      })
+    )!;
+    await vi.waitFor(() => expect(state.roots.value[0]?.id).toBe("a"));
+    collection.value = "b";
+    expect(state.roots.value).toEqual([]);
+    await vi.waitFor(() => expect(state.roots.value[0]?.id).toBe("b"));
+    expect(tenants).toEqual(["a", "b"]);
+    scope.stop();
+  });
   it("requests actual root locations and the full mixed hierarchy", async () => {
     const fixture = setup(vi.fn().mockResolvedValue(result([{ id: "real-root", name: "Attic" }])));
     await vi.waitFor(() => expect(fixture.state.loading.value).toBe(false));
