@@ -39,7 +39,11 @@
     },
   });
 
+  const preferences = useViewPreferences();
+  // Item and collection schedules share this component, but not their cache.
+  // Otherwise navigating from an item log can reuse its data as the collection schedule.
   const { data: maintenanceDataList, refresh: refreshList } = useAsyncData(
+    () => `maintenance:${preferences.value.collectionId}:${props.currentItemId ?? "collection"}`,
     async () => {
       const { data } =
         props.currentItemId !== undefined

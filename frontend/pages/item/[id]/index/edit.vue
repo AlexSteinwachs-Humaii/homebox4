@@ -57,26 +57,29 @@
     data: nullableItem,
     refresh,
     pending: requestPending,
-  } = useAsyncData(async () => {
-    const { data, error } = await api.items.get(itemId.value);
-    if (error) {
-      toast.error(t("items.toast.failed_load_item"));
-      navigateTo("/home");
-      return;
+  } = useAsyncData(
+    () => `item-edit:${preferences.value.collectionId}:${itemId.value}`,
+    async () => {
+      const { data, error } = await api.items.get(itemId.value);
+      if (error || !data || data.id !== itemId.value) {
+        toast.error(t("items.toast.failed_load_item"));
+        navigateTo("/items");
+        return;
+      }
+
+      if (data.parent && data.parent.entityType && !data.parent.entityType.isLocation) {
+        parent.value = data.parent;
+      }
+
+      // The "Location" selector shows the derived location (nearest ancestor
+      // that is a location-type entity), not the direct parent — when the item
+      // sits inside another item, the parent is shown in "Parent Item" and the
+      // location stays e.g. "Attic" (#1589).
+      location.value = data.location ?? (data.parent?.entityType?.isLocation ? data.parent : null);
+
+      return data;
     }
-
-    if (data.parent && data.parent.entityType && !data.parent.entityType.isLocation) {
-      parent.value = data.parent;
-    }
-
-    // The "Location" selector shows the derived location (nearest ancestor
-    // that is a location-type entity), not the direct parent — when the item
-    // sits inside another item, the parent is shown in "Parent Item" and the
-    // location stays e.g. "Attic" (#1589).
-    location.value = data.location ?? (data.parent?.entityType?.isLocation ? data.parent : null);
-
-    return data;
-  });
+  );
 
   const item = ref<EntityOut & { tagIds: string[] }>(null as never);
 

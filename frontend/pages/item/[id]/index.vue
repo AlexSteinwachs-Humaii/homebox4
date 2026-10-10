@@ -116,14 +116,15 @@
     loadVersion++;
   });
 
-  const lastRoute = ref(route.fullPath);
-  watchEffect(() => {
-    if (lastRoute.value.endsWith("edit")) {
-      refresh();
+  // Watch paths, not query strings or reactive data read by refresh. This also
+  // covers Cancel and browser Back/Forward after saving without redirecting.
+  watch(
+    () => route.path.replace(/\/$/, ""),
+    (path, previousPath) => {
+      const detailPath = `/item/${itemId.value}`;
+      if (path === detailPath && previousPath === `${detailPath}/edit`) refresh();
     }
-
-    lastRoute.value = route.fullPath;
-  });
+  );
 
   async function adjustQuantity(amount: number) {
     if (!item.value) {
@@ -383,8 +384,13 @@
       },
       {
         id: "log",
-        name: "global.maintenance",
+        name: "items.item_maintenance",
         to: `/item/${itemId.value}/maintenance`,
+      },
+      {
+        id: "schedule",
+        name: "items.collection_schedule",
+        to: "/maintenance",
       },
       {
         id: "edit",
@@ -549,6 +555,9 @@
     </Dialog>
 
     <section>
+      <NuxtLink to="/items" class="mb-4 inline-block text-primary underline">
+        {{ $t("items.back_to_inventory") }}
+      </NuxtLink>
       <Card class="p-3">
         <header :class="{ 'mb-2': item.description }">
           <div class="flex flex-wrap items-end gap-2">
@@ -607,6 +616,10 @@
                 <span class="hidden md:inline">{{ $t("global.create_subitem") }}</span>
               </Button>
 
+              <Button as-child>
+                <NuxtLink :to="`/item/${item.id}/edit`">{{ $t("items.edit_item") }}</NuxtLink>
+              </Button>
+
               <!-- More actions dropdown -->
               <DropdownMenu>
                 <DropdownMenuTrigger as-child>
@@ -655,7 +668,7 @@
     <section>
       <div class="space-y-6">
         <!-- this renders the other pages content -->
-        <NuxtPage :item="item" :page-key="itemId" />
+        <NuxtPage :item="item" :page-key="`${preferences.collectionId}:${itemId}:${route.path}`" />
 
         <!-- anything in this is not rendered if on another page -->
         <template v-if="!hasNested">
@@ -747,7 +760,10 @@
   </BaseContainer>
   <BaseContainer v-else>
     <p v-if="loading" role="status" class="p-6">{{ $t("global.loading") }}</p>
-    <div v-else-if="failed" role="alert" class="space-y-4 p-6">
+    <NuxtLink to="/items" class="inline-block p-6 text-primary underline">
+      {{ $t("items.back_to_inventory") }}
+    </NuxtLink>
+    <div v-if="failed" role="alert" class="space-y-4 p-6">
       <p>{{ $t("items.unavailable") }}</p>
       <Button variant="outline" @click="refresh">{{ $t("global.retry") }}</Button>
     </div>
