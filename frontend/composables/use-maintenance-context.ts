@@ -3,6 +3,16 @@ import type { ItemsApi } from "../lib/api/classes/items";
 import type { EntityOut, MaintenanceEntryWithDetails } from "../lib/api/types/data-contracts";
 import { maintenanceCalendarDate } from "./use-maintenance-schedule";
 
+/** Missing means no item id; loading means the authorized request has not settled. */
+export function maintenanceContextState(
+  items: Record<string, unknown>,
+  itemID: string | null | undefined
+): "missing" | "loading" | "unavailable" | "ready" {
+  if (!itemID) return "missing";
+  if (!(itemID in items)) return "loading";
+  return items[itemID] ? "ready" : "unavailable";
+}
+
 /** Context is collection-scoped, deduplicated, and loaded independently of schedule availability. */
 export function useMaintenanceContext(
   collectionId: Ref<string | null | undefined>,

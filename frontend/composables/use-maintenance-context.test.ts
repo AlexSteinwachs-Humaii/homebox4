@@ -1,6 +1,6 @@
 import { effectScope, ref } from "vue";
 import { describe, expect, it, vi } from "vitest";
-import { useMaintenanceContext } from "./use-maintenance-context";
+import { maintenanceContextState, useMaintenanceContext } from "./use-maintenance-context";
 import type { ItemsApi } from "../lib/api/classes/items";
 import type { MaintenanceEntryWithDetails } from "../lib/api/types/data-contracts";
 const task = (itemID: string, scheduledDate = "") => ({ itemID, scheduledDate }) as MaintenanceEntryWithDetails;
@@ -18,6 +18,12 @@ function setup(get: ReturnType<typeof vi.fn>, records = [task("a"), task("b", "2
   return { collection, entries, scope, state, tenants };
 }
 describe("authorized maintenance context", () => {
+  it("does not treat an in-flight context load as unavailable", () => {
+    expect(maintenanceContextState({}, "tool")).toBe("loading");
+    expect(maintenanceContextState({ tool: null }, "tool")).toBe("unavailable");
+    expect(maintenanceContextState({ tool: { id: "tool" } }, "tool")).toBe("ready");
+    expect(maintenanceContextState({}, "")).toBe("missing");
+  });
   it("deduplicates items and derives the panel from the first dated record, not an upcoming rule", async () => {
     const get = vi.fn(async (id: string) => ({
       data: { id, name: id, location: { id: "garage", name: "Real garage" } },

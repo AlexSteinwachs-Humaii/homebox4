@@ -876,6 +876,7 @@
             "unnamed": "Unnamed task",
             "unnamed_item": "Unnamed item",
             "item_unavailable": "Associated item unavailable",
+            "context_loading": "Loading item and location context\u2026",
             "context_unavailable": "Item and location context unavailable",
             "no_location": "No location recorded",
             "inside": "Inside",

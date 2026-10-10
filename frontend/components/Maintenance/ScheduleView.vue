@@ -1,11 +1,12 @@
 <script setup lang="ts">
-  import BaseCard from "@/components/Base/Card.vue";
   import { Badge } from "@/components/ui/badge";
   import { Button } from "@/components/ui/button";
   import DateTime from "~/components/global/DateTime.vue";
+  import Panel from "~/components/WarmHabitat/Panel.vue";
   import { maintenanceCalendarDate, useMaintenanceSchedule } from "~/composables/use-maintenance-schedule";
   import { defineObserver } from "~/composables/use-api";
-  import { useMaintenanceContext } from "~/composables/use-maintenance-context";
+  import { maintenanceContextState, useMaintenanceContext } from "~/composables/use-maintenance-context";
+  import type { EntityOut } from "~/lib/api/types/data-contracts";
 
   const preferences = useViewPreferences();
   const collectionId = computed(() => preferences.value.collectionId);
@@ -26,6 +27,13 @@
     },
   });
   onScopeDispose(removeObserver);
+
+  function contextFor(itemID: string | undefined) {
+    return maintenanceContextState(items.value, itemID);
+  }
+  function loadedItem(itemID: string | undefined): EntityOut | null {
+    return itemID ? (items.value[itemID] ?? null) : null;
+  }
 </script>
 
 <template>
@@ -34,15 +42,17 @@
       {{ $t("maintenance.filter.scheduled") }}
     </div>
     <div class="grid items-start gap-6 lg:grid-cols-[minmax(0,2fr)_minmax(0,1fr)]">
-      <BaseCard class="min-w-0">
-        <div class="border-b p-6">
-          <h2 id="maintenance-schedule-heading" class="font-serif text-2xl">
-            {{ $t("maintenance.schedule.work") }}
-          </h2>
-          <p class="mt-2 text-sm text-muted-foreground">
-            {{ $t("maintenance.schedule.status_help") }}
-          </p>
-        </div>
+      <Panel class="min-w-0">
+        <template #header>
+          <div class="min-w-0">
+            <h2 id="maintenance-schedule-heading" class="habitat-heading">
+              {{ $t("maintenance.schedule.work") }}
+            </h2>
+            <p class="mt-2 text-sm text-muted-foreground">
+              {{ $t("maintenance.schedule.status_help") }}
+            </p>
+          </div>
+        </template>
         <p v-if="!collectionId" class="p-6" role="status">
           {{ $t("maintenance.schedule.select_collection") }}
         </p>
@@ -72,39 +82,40 @@
                 </h3>
                 <Badge variant="outline">{{ $t("maintenance.filter.scheduled") }}</Badge>
               </div>
-              <NuxtLink
-                v-if="entry.itemID"
-                :to="`/item/${entry.itemID}`"
-                class="block break-words text-primary underline"
-              >
+              <NuxtLink v-if="entry.itemID" :to="`/item/${entry.itemID}`" class="habitat-link block break-words">
                 {{ entry.itemName || $t("maintenance.schedule.unnamed_item") }}
               </NuxtLink>
               <p v-else class="text-sm text-muted-foreground">
                 {{ $t("maintenance.schedule.item_unavailable") }}
               </p>
               <div class="text-sm text-muted-foreground">
-                <template v-if="items[entry.itemID]">
+                <template v-if="contextFor(entry.itemID) === 'ready' && loadedItem(entry.itemID)">
                   <NuxtLink
-                    v-if="items[entry.itemID]?.location"
-                    :to="`/location/${items[entry.itemID]?.location?.id}`"
-                    class="underline"
+                    v-if="loadedItem(entry.itemID)?.location?.id"
+                    :to="`/location/${loadedItem(entry.itemID)?.location?.id}`"
+                    class="habitat-link"
                   >
-                    {{ items[entry.itemID]?.location?.name }}
+                    {{ loadedItem(entry.itemID)?.location?.name || $t("maintenance.schedule.no_location") }}
                   </NuxtLink>
                   <span v-else>{{ $t("maintenance.schedule.no_location") }}</span>
                   <span
                     v-if="
-                      items[entry.itemID]?.parent &&
-                      items[entry.itemID]?.parent?.id !== items[entry.itemID]?.location?.id
+                      loadedItem(entry.itemID)?.parent?.id &&
+                      loadedItem(entry.itemID)?.parent?.id !== loadedItem(entry.itemID)?.location?.id
                     "
                   >
                     · {{ $t("maintenance.schedule.inside") }}
-                    <NuxtLink :to="`/item/${items[entry.itemID]?.parent?.id}`" class="underline">{{
-                      items[entry.itemID]?.parent?.name
+                    <NuxtLink :to="`/item/${loadedItem(entry.itemID)?.parent?.id}`" class="habitat-link">{{
+                      loadedItem(entry.itemID)?.parent?.name || $t("maintenance.schedule.unnamed_item")
                     }}</NuxtLink>
                   </span>
                 </template>
-                <span v-else>{{ $t("maintenance.schedule.context_unavailable") }}</span>
+                <span v-else-if="contextFor(entry.itemID) === 'loading'">{{
+                  $t("maintenance.schedule.context_loading")
+                }}</span>
+                <span v-else-if="contextFor(entry.itemID) === 'unavailable'">{{
+                  $t("maintenance.schedule.context_unavailable")
+                }}</span>
               </div>
               <p class="whitespace-pre-wrap break-words text-sm text-muted-foreground">
                 {{ entry.description || $t("maintenance.schedule.no_description") }}
@@ -112,33 +123,66 @@
             </div>
           </li>
         </ul>
-      </BaseCard>
-      <BaseCard class="min-w-0 space-y-4 p-6">
-        <template v-if="contextEntry">
-          <h2 class="font-serif text-2xl">
+      </Panel>
+      <div class="min-w-0 space-y-6">
+        <Panel v-if="contextEntry" class="space-y-4 p-6">
+          <h2 class="habitat-heading">
             {{ $t("maintenance.schedule.item_context") }}
           </h2>
-          <template v-if="contextItem">
+          <p class="text-sm text-muted-foreground">
+            <span class="mb-1 block text-xs">{{ $t("maintenance.schedule.due") }}</span>
+            <time
+              v-if="maintenanceCalendarDate(contextEntry.scheduledDate)"
+              :datetime="String(contextEntry.scheduledDate)"
+            >
+              <DateTime :date="contextEntry.scheduledDate" format="human" datetime-type="date" />
+            </time>
+            <span v-else>{{ $t("maintenance.schedule.no_due_date") }}</span>
+          </p>
+          <template v-if="contextFor(contextEntry.itemID) === 'ready' && contextItem">
             <h3 class="break-words font-semibold">{{ contextItem.name }}</h3>
+            <p class="text-sm text-muted-foreground">
+              <NuxtLink
+                v-if="contextItem.location?.id"
+                :to="`/location/${contextItem.location.id}`"
+                class="habitat-link"
+              >
+                {{ contextItem.location.name || $t("maintenance.schedule.no_location") }}
+              </NuxtLink>
+              <span v-else>{{ $t("maintenance.schedule.no_location") }}</span>
+              <span v-if="contextItem.parent?.id && contextItem.parent.id !== contextItem.location?.id">
+                · {{ $t("maintenance.schedule.inside") }}
+                <NuxtLink :to="`/item/${contextItem.parent.id}`" class="habitat-link">{{
+                  contextItem.parent.name || $t("maintenance.schedule.unnamed_item")
+                }}</NuxtLink>
+              </span>
+            </p>
             <p class="whitespace-pre-wrap break-words text-sm text-muted-foreground">
               {{ contextItem.description || $t("maintenance.schedule.no_description") }}
             </p>
-            <NuxtLink :to="`/item/${contextItem.id}`" class="block text-primary underline">{{
+            <NuxtLink :to="`/item/${contextItem.id}`" class="habitat-link block">{{
               $t("maintenance.schedule.open_item")
             }}</NuxtLink>
           </template>
+          <p v-else-if="contextFor(contextEntry.itemID) === 'loading'" class="text-sm text-muted-foreground">
+            {{ $t("maintenance.schedule.context_loading") }}
+          </p>
+          <p v-else-if="contextFor(contextEntry.itemID) === 'missing'" class="text-sm text-muted-foreground">
+            {{ $t("maintenance.schedule.item_unavailable") }}
+          </p>
           <p v-else class="text-sm text-muted-foreground">
             {{ $t("maintenance.schedule.context_unavailable") }}
           </p>
-          <hr />
-        </template>
-        <h2 class="mb-3 font-serif text-2xl">
-          {{ $t("maintenance.schedule.read_only") }}
-        </h2>
-        <p class="text-sm text-muted-foreground">
-          {{ $t("maintenance.schedule.read_only_help") }}
-        </p>
-      </BaseCard>
+        </Panel>
+        <Panel class="space-y-3 p-6">
+          <h2 class="habitat-heading">
+            {{ $t("maintenance.schedule.read_only") }}
+          </h2>
+          <p class="text-sm text-muted-foreground">
+            {{ $t("maintenance.schedule.read_only_help") }}
+          </p>
+        </Panel>
+      </div>
     </div>
   </section>
 </template>
