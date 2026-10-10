@@ -395,6 +395,16 @@ echo "Adding attachments to group 2 items..."
 attach_file_to_item "$user6_token" "$item6_id" "monitor-receipt.pdf"
 attach_file_to_item "$user6_token" "$item7_id" "keyboard-manual.pdf"
 
+# Seed genuinely pre-upgrade settings. Do not include the new migration marker.
+# curl -f ensures an unsupported settings endpoint cannot silently weaken this check.
+legacy_settings='{"theme":"dark","showEmpty":false,"itemsPerTablePage":24,"claudeUpgradeSentinel":{"retained":true}}'
+curl --fail-with-body -sS -X PUT \
+    -H "Authorization: Bearer $user1_token" \
+    -H "Content-Type: application/json" \
+    -d "$legacy_settings" "$API_URL/users/self/settings" > /dev/null
+jq --argjson settings "$legacy_settings" '.legacySettings = $settings' \
+    "$TEST_DATA_FILE" > "$TEST_DATA_FILE.tmp" && mv "$TEST_DATA_FILE.tmp" "$TEST_DATA_FILE"
+
 echo "=== Test Data Creation Complete ==="
 echo "Test data file saved to: $TEST_DATA_FILE"
 echo "Summary:"

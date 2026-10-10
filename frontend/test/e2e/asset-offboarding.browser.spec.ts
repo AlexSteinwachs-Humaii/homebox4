@@ -1,7 +1,7 @@
 import { expect, test } from "@playwright/test";
 
 for (const width of [1440, 390]) {
-  test(`retains lifecycle history and supports discovery at ${width}px`, async ({ page }) => {
+  test(`retains lifecycle history and supports discovery at ${width}px`, async ({ page }, testInfo) => {
     test.setTimeout(120000);
     await page.setViewportSize({ width, height: 900 });
     const email = `lifecycle-${width}-${Date.now()}@example.com`;
@@ -17,6 +17,7 @@ for (const width of [1440, 390]) {
     await page.getByRole("button", { name: "Login", exact: true }).click();
     const { token } = await (await login).json();
     await expect(page).toHaveURL("/home");
+    await expect(page.locator("html")).toHaveAttribute("data-theme", "claude");
     const name = `Lifecycle asset ${width}`;
     const created = await page.request.post("/api/v1/entities", {
       headers: { Authorization: token },
@@ -40,6 +41,10 @@ for (const width of [1440, 390]) {
     await dialog.getByLabel("Outcome").selectOption("custom");
     await dialog.getByRole("button", { name: "Offboard", exact: true }).click();
     await expect(dialog.getByRole("alert")).toHaveText("Enter a custom reason.");
+    await testInfo.attach(`Claude offboarding validation at ${width}px`, {
+      body: await page.screenshot(),
+      contentType: "image/png",
+    });
     await dialog.getByRole("button", { name: "Cancel" }).click();
     await expect(dialog).toHaveCount(0);
     await expect(page.getByText("Offboarding history", { exact: true })).toHaveCount(0);
@@ -103,10 +108,22 @@ for (const width of [1440, 390]) {
     await page.goto("/home");
     const recent = page.locator("section").filter({ hasText: "Recently Added" });
     await expect(recent).toContainText(name);
+    await expect(page.locator("html")).toHaveAttribute("data-theme", "claude");
+    if (width >= 768) {
+      await expect(recent.getByRole("cell", { name: item.assetId, exact: true })).toBeVisible();
+    } else {
+      await expect(recent.locator(`a[href='/item/${item.id}']`).first()).toContainText(`Asset ID: ${item.assetId}`);
+    }
+    await testInfo.attach(`Claude homepage Asset ID at ${width}px`, {
+      body: await page.screenshot(),
+      contentType: "image/png",
+    });
     await page.goto(`/items?q=${encodeURIComponent(name)}`);
     await expect(page.locator(`a[href='/item/${item.id}']`).first()).toBeVisible();
     await page.getByLabel("Lifecycle", { exact: true }).selectOption("offboarded");
     await expect(page.locator(`a[href='/item/${item.id}']`)).toHaveCount(0);
-    await page.request.delete(`/api/v1/entities/${item.id}`, { headers: { Authorization: token } });
+    await page.request.delete(`/api/v1/entities/${item.id}`, {
+      headers: { Authorization: token },
+    });
   });
 }

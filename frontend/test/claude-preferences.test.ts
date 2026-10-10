@@ -1,3 +1,4 @@
+// @vitest-environment jsdom
 import { readFileSync } from "node:fs";
 import { beforeEach, afterEach, describe, expect, it, vi } from "vitest";
 import { ref, watch, nextTick } from "vue";
