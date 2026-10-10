@@ -1,9 +1,9 @@
 <script setup lang="ts">
   import { useI18n } from "vue-i18n";
   import { toast } from "@/components/ui/sonner";
-  import type { AnyDetail, Detail, Details } from "~~/components/global/DetailsSection/types";
+  import type { Detail, Details } from "~~/components/global/DetailsSection/types";
   import { filterZeroValues } from "~~/components/global/DetailsSection/types";
-  import type { ItemAttachment } from "~~/lib/api/types/data-contracts";
+  import type { EntityOut, EntityPath, EntitySummary, ItemAttachment } from "~~/lib/api/types/data-contracts";
   import MdiPackageVariant from "~icons/mdi/package-variant";
   import MdiPlus from "~icons/mdi/plus";
   import MdiMinus from "~icons/mdi/minus";
@@ -11,7 +11,6 @@
   import MdiPlusBoxMultipleOutline from "~icons/mdi/plus-box-multiple-outline";
   import MdiContentSaveEdit from "~icons/mdi/content-save-edit";
   import MdiDotsVertical from "~icons/mdi/dots-vertical";
-  import { Separator } from "@/components/ui/separator";
   import {
     DropdownMenu,
     DropdownMenuContent,
@@ -39,11 +38,11 @@
   import TagChip from "~/components/Tag/Chip.vue";
   import DateTime from "~/components/global/DateTime.vue";
   import LabelMaker from "~/components/global/LabelMaker.vue";
-  import Markdown from "~/components/global/Markdown.vue";
   import BaseCard from "@/components/Base/Card.vue";
   import CopyText from "@/components/global/CopyText.vue";
   import DetailsSection from "~/components/global/DetailsSection/DetailsSection.vue";
   import ItemAttachmentsList from "~/components/Item/AttachmentsList.vue";
+  import ItemDetails from "~/components/WarmHabitat/ItemDetails.vue";
   import ItemViewSelectable from "~/components/Item/View/Selectable.vue";
 
   const { t } = useI18n();
@@ -55,10 +54,14 @@
   });
 
   const route = useRoute();
-  const api = useUserApi();
 
   const itemId = computed<string>(() => route.params.id as string);
   const preferences = useViewPreferences();
+  const api = computed(() => {
+    // useUserApi captures the tenant header when constructed.
+    void preferences.value.collectionId;
+    return useUserApi();
+  });
 
   const temporaryDuplicateSettings = ref<DuplicateSettings>({
     copyMaintenance: preferences.value.duplicateSettings.copyMaintenance,
@@ -68,20 +71,49 @@
   });
 
   const hasNested = computed<boolean>(() => {
-    return route.fullPath.split("/").at(-1) !== itemId.value;
+    return route.path.replace(/\/$/, "").split("/").at(-1) !== itemId.value;
   });
 
-  const { data: item, refresh } = useAsyncData(itemId.value, async () => {
-    const { data, error } = await api.items.get(itemId.value);
-    if (error) {
-      toast.error(t("items.toast.failed_load_item"));
-      navigateTo("/home");
-      return;
+  const item = ref<EntityOut>();
+  const fullpath = ref<EntityPath[]>([]);
+  const loading = ref(false);
+  const failed = ref(false);
+  const items = ref<EntitySummary[]>([]);
+  let loadVersion = 0;
+
+  async function refresh() {
+    const version = ++loadVersion;
+    const id = itemId.value;
+    item.value = undefined;
+    fullpath.value = [];
+    items.value = [];
+    loading.value = true;
+    failed.value = false;
+    try {
+      // Recreate the client so X-Tenant follows the currently selected collection.
+      const client = useUserApi();
+      const { data, error } = await client.items.get(id);
+      if (version !== loadVersion) return;
+      if (error || !data || data.id !== id) {
+        failed.value = true;
+        return;
+      }
+      item.value = data;
+      const path = await client.items.fullpath(id);
+      if (version === loadVersion && !path.error) fullpath.value = path.data;
+      if (version === loadVersion) await refreshItemList();
+    } catch {
+      if (version === loadVersion) failed.value = true;
+    } finally {
+      if (version === loadVersion) loading.value = false;
     }
-    return data;
+  }
+  watch([itemId, () => preferences.value.collectionId], refresh, {
+    immediate: true,
+    flush: "sync",
   });
-  onMounted(() => {
-    refresh();
+  onBeforeUnmount(() => {
+    loadVersion++;
   });
 
   const lastRoute = ref(route.fullPath);
@@ -104,10 +136,12 @@
       return;
     }
 
-    const resp = await api.items.patch(item.value.id, {
+    const version = loadVersion;
+    const resp = await api.value.items.patch(item.value.id, {
       id: item.value.id,
       quantity: newQuantity,
     });
+    if (version !== loadVersion) return;
 
     if (resp.error) {
       toast.error(t("items.toast.failed_adjust_quantity"));
@@ -145,12 +179,12 @@
       item.value.attachments.reduce((acc, cur) => {
         if (cur.type === "photo") {
           const photo: Photo = {
-            originalSrc: api.authURL(`/entities/${item.value!.id}/attachments/${cur.id}`),
+            originalSrc: api.value.authURL(`/entities/${item.value!.id}/attachments/${cur.id}`),
             originalType: cur.mimeType,
             attachmentId: cur.id,
           };
           if (cur.thumbnail) {
-            photo.thumbnailSrc = api.authURL(`/entities/${item.value!.id}/attachments/${cur.thumbnail.id}`);
+            photo.thumbnailSrc = api.value.authURL(`/entities/${item.value!.id}/attachments/${cur.thumbnail.id}`);
           } else {
             photo.thumbnailSrc = photo.originalSrc; // fallback to itself if no thumbnail
           }
@@ -194,91 +228,6 @@
         receipts: [] as ItemAttachment[],
       }
     );
-  });
-
-  const assetID = computed<Details>(() => {
-    if (!item.value) {
-      return [];
-    }
-
-    if (item.value?.assetId === "000-000") {
-      return [];
-    }
-
-    return [
-      {
-        name: "items.asset_id",
-        text: item.value?.assetId,
-      },
-    ];
-  });
-
-  const itemDetails = computed<Details>(() => {
-    if (!item.value) {
-      return [];
-    }
-
-    const ret: Details = [
-      {
-        name: "items.quantity",
-        text: item.value?.quantity,
-        slot: "quantity",
-      },
-      {
-        name: "items.serial_number",
-        text: item.value?.serialNumber,
-        copyable: true,
-      },
-      {
-        name: "items.model_number",
-        text: item.value?.modelNumber,
-        copyable: true,
-      },
-      {
-        name: "items.manufacturer",
-        text: item.value?.manufacturer,
-        copyable: true,
-      },
-      {
-        name: "items.insured",
-        text: item.value?.insured ? "Yes" : "No",
-      },
-      {
-        name: "items.archived",
-        text: item.value?.archived ? "Yes" : "No",
-      },
-      {
-        name: "items.notes",
-        type: "markdown",
-        text: item.value?.notes,
-      },
-      ...assetID.value,
-      ...item.value.fields.map(field => {
-        /**
-         * Support Special URL Syntax
-         */
-        const url = maybeUrl(field.textValue);
-        if (url.isUrl) {
-          return {
-            type: "link",
-            name: field.name,
-            text: url.text,
-            href: url.url,
-          } as AnyDetail;
-        }
-
-        return {
-          name: field.name,
-          text: field.textValue,
-        };
-      }),
-    ];
-
-    if (!preferences.value.showEmpty) {
-      return filterZeroValues(ret);
-    }
-
-    return ret;
   });
 
   const showAttachments = computed(() => {
@@ -366,39 +315,6 @@
     return details;
   });
 
-  const showPurchase = computed(() => {
-    if (preferences.value.showEmpty) {
-      return true;
-    }
-    return item.value?.purchaseFrom || item.value?.purchasePrice !== 0 || validDate(item.value?.purchaseDate);
-  });
-
-  const purchaseDetails = computed<Details>(() => {
-    const v: Details = [
-      {
-        name: "items.purchased_from",
-        text: item.value?.purchaseFrom || "",
-      },
-      {
-        name: "items.purchase_price",
-        text: String(item.value?.purchasePrice) || "",
-        type: "currency",
-      },
-      {
-        name: "items.purchase_date",
-        text: item.value?.purchaseDate || "",
-        type: "date",
-        date: true,
-      },
-    ];
-
-    if (!preferences.value.showEmpty) {
-      return filterZeroValues(v);
-    }
-
-    return v;
-  });
-
   const showSold = computed(() => {
     if (preferences.value.showEmpty) {
       return true;
@@ -443,8 +359,8 @@
         itemId,
       },
       onClose: result => {
-        if (result?.action === "delete") {
-          item.value!.attachments = item.value!.attachments.filter(a => a.id !== result.id);
+        if (result?.action === "delete" && item.value?.id === itemId) {
+          item.value.attachments = item.value.attachments.filter(a => a.id !== result.id);
         }
       },
     });
@@ -478,42 +394,18 @@
     ];
   });
 
-  const fullpath = computedAsync(async () => {
-    if (!item.value) {
-      return [];
-    }
-
-    const resp = await api.items.fullpath(item.value.id);
+  async function refreshItemList() {
+    const version = loadVersion;
+    const id = item.value?.id;
+    if (!id) return;
+    const resp = await api.value.items.getAll({ parentIds: [id] });
+    if (version !== loadVersion) return;
     if (resp.error) {
-      toast.error(t("items.toast.failed_load_item"));
-      return [];
+      items.value = [];
+      return;
     }
-
-    return resp.data;
-  });
-
-  const { data: items, refresh: refreshItemList } = useAsyncData(
-    () => itemId.value + "_item_list",
-    async () => {
-      if (!itemId.value) {
-        return [];
-      }
-
-      const resp = await api.items.getAll({
-        parentIds: [itemId.value],
-      });
-
-      if (resp.error) {
-        toast.error(t("items.toast.failed_load_items"));
-        return [];
-      }
-
-      return resp.data.items;
-    },
-    {
-      watch: [itemId],
-    }
-  );
+    items.value = resp.data.items;
+  }
 
   async function duplicateItem(settings?: DuplicateSettings) {
     if (!item.value) {
@@ -534,7 +426,7 @@
           copyPrefix: preferences.value.duplicateSettings.copyPrefixOverride ?? t("items.duplicate.prefix"),
         };
 
-    const { error, data } = await api.items.duplicate(itemId.value, duplicateSettings);
+    const { error, data } = await api.value.items.duplicate(itemId.value, duplicateSettings);
 
     if (error) {
       toast.error(t("items.toast.failed_duplicate_item"));
@@ -561,7 +453,7 @@
       return;
     }
 
-    const { error } = await api.items.delete(itemId.value);
+    const { error } = await api.value.items.delete(itemId.value);
     if (error) {
       toast.error(t("items.toast.failed_delete_item"));
       return;
@@ -607,13 +499,17 @@
       })),
     };
 
-    const { data, error } = await api.templates.create(templateData);
+    const { data, error } = await api.value.templates.create(templateData);
     if (error) {
       toast.error(t("components.template.toast.create_failed"));
       return;
     }
 
-    toast.success(t("components.template.toast.saved_as_template", { name: templateData.name }));
+    toast.success(
+      t("components.template.toast.saved_as_template", {
+        name: templateData.name,
+      })
+    );
     navigateTo(`/template/${data.id}`);
   }
 
@@ -681,7 +577,7 @@
                   </BreadcrumbItem>
                 </BreadcrumbList>
               </Breadcrumb>
-              <h1 class="text-wrap pb-1 text-2xl">
+              <h1 class="text-wrap pb-1 font-serif text-4xl">
                 {{ item ? item.name : "" }}
               </h1>
               <div class="flex flex-wrap gap-2 pb-1">
@@ -737,10 +633,6 @@
             </div>
           </div>
         </header>
-        <Separator v-if="item.description" />
-        <div v-if="item.description" class="prose max-w-full p-1">
-          <Markdown class="text-base" :source="item.description" />
-        </div>
       </Card>
 
       <div class="mb-6 mt-3 flex flex-wrap items-center justify-between">
@@ -766,20 +658,20 @@
         <NuxtPage :item="item" :page-key="itemId" />
 
         <!-- anything in this is not rendered if on another page -->
-        <BaseCard v-if="!hasNested" collapsable>
-          <template #title> {{ $t("items.details") }} </template>
-          <template #title-actions>
-            <div class="mt-2 flex flex-wrap items-center justify-between gap-4">
-              <Label class="flex cursor-pointer items-center gap-2">
-                <Switch v-model="preferences.showEmpty" />
-                {{ $t("items.show_empty") }}
-              </Label>
-              <div class="space-x-1">
-                <CopyText :text="currentUrl" :icon-size="16" />
-              </div>
-            </div>
-          </template>
-          <DetailsSection :details="itemDetails">
+        <template v-if="!hasNested">
+          <div class="flex flex-wrap items-center justify-end gap-4">
+            <Label class="flex cursor-pointer items-center gap-2">
+              <Switch v-model="preferences.showEmpty" />
+              {{ $t("items.show_empty") }}
+            </Label>
+            <CopyText :text="currentUrl" :icon-size="16" />
+          </div>
+          <ItemDetails
+            :item="item"
+            :photos="photos"
+            :show-empty="preferences.showEmpty"
+            @photo="openImageDialog($event, item.id)"
+          >
             <template #quantity="{ detail }">
               <div class="flex items-center">
                 {{ detail.text }}
@@ -795,19 +687,7 @@
                 </span>
               </div>
             </template>
-          </DetailsSection>
-        </BaseCard>
-
-        <!-- anything in this is not rendered if on another page -->
-        <template v-if="!hasNested">
-          <BaseCard v-if="photos && photos.length > 0">
-            <template #title> {{ $t("items.photos") }} </template>
-            <div class="scroll-bg container mx-auto flex max-h-[500px] flex-wrap gap-2 overflow-y-scroll border-t p-4">
-              <button v-for="(img, i) in photos" :key="i" @click="openImageDialog(img, item.id)">
-                <img class="max-h-[200px] rounded" :src="img.thumbnailSrc" :alt="$t('items.photo')" loading="lazy" />
-              </button>
-            </div>
-          </BaseCard>
+          </ItemDetails>
 
           <BaseCard v-if="showAttachments" collapsable>
             <template #title> {{ $t("items.attachments") }} </template>
@@ -842,13 +722,10 @@
               </template>
             </DetailsSection>
             <div v-else>
-              <p class="px-6 pb-4 text-foreground/70">{{ $t("items.no_attachments") }}</p>
+              <p class="px-6 pb-4 text-foreground/70">
+                {{ $t("items.no_attachments") }}
+              </p>
             </div>
-          </BaseCard>
-
-          <BaseCard v-if="showPurchase" collapsable>
-            <template #title> {{ $t("items.purchase_details") }} </template>
-            <DetailsSection :details="purchaseDetails" />
           </BaseCard>
 
           <BaseCard v-if="showWarranty" collapsable>
@@ -867,6 +744,13 @@
     <section v-if="items && items.length > 0" class="mt-6">
       <ItemViewSelectable :items="items" @refresh="refreshItemList" />
     </section>
+  </BaseContainer>
+  <BaseContainer v-else>
+    <p v-if="loading" role="status" class="p-6">{{ $t("global.loading") }}</p>
+    <div v-else-if="failed" role="alert" class="space-y-4 p-6">
+      <p>{{ $t("items.unavailable") }}</p>
+      <Button variant="outline" @click="refresh">{{ $t("global.retry") }}</Button>
+    </div>
   </BaseContainer>
 </template>
 
