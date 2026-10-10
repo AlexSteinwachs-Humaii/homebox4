@@ -22,6 +22,7 @@ import (
 	"github.com/sysadminsmedia/homebox/backend/internal/data/ent/authtokens"
 	"github.com/sysadminsmedia/homebox/backend/internal/data/ent/entity"
 	"github.com/sysadminsmedia/homebox/backend/internal/data/ent/entityfield"
+	"github.com/sysadminsmedia/homebox/backend/internal/data/ent/entityoffboarding"
 	"github.com/sysadminsmedia/homebox/backend/internal/data/ent/entitytemplate"
 	"github.com/sysadminsmedia/homebox/backend/internal/data/ent/entitytype"
 	"github.com/sysadminsmedia/homebox/backend/internal/data/ent/export"
@@ -53,6 +54,8 @@ type Client struct {
 	Entity *EntityClient
 	// EntityField is the client for interacting with the EntityField builders.
 	EntityField *EntityFieldClient
+	// EntityOffboarding is the client for interacting with the EntityOffboarding builders.
+	EntityOffboarding *EntityOffboardingClient
 	// EntityTemplate is the client for interacting with the EntityTemplate builders.
 	EntityTemplate *EntityTemplateClient
 	// EntityType is the client for interacting with the EntityType builders.
@@ -94,6 +97,7 @@ func (c *Client) init() {
 	c.AuthTokens = NewAuthTokensClient(c.config)
 	c.Entity = NewEntityClient(c.config)
 	c.EntityField = NewEntityFieldClient(c.config)
+	c.EntityOffboarding = NewEntityOffboardingClient(c.config)
 	c.EntityTemplate = NewEntityTemplateClient(c.config)
 	c.EntityType = NewEntityTypeClient(c.config)
 	c.Export = NewExportClient(c.config)
@@ -204,6 +208,7 @@ func (c *Client) Tx(ctx context.Context) (*Tx, error) {
 		AuthTokens:           NewAuthTokensClient(cfg),
 		Entity:               NewEntityClient(cfg),
 		EntityField:          NewEntityFieldClient(cfg),
+		EntityOffboarding:    NewEntityOffboardingClient(cfg),
 		EntityTemplate:       NewEntityTemplateClient(cfg),
 		EntityType:           NewEntityTypeClient(cfg),
 		Export:               NewExportClient(cfg),
@@ -241,6 +246,7 @@ func (c *Client) BeginTx(ctx context.Context, opts *sql.TxOptions) (*Tx, error) 
 		AuthTokens:           NewAuthTokensClient(cfg),
 		Entity:               NewEntityClient(cfg),
 		EntityField:          NewEntityFieldClient(cfg),
+		EntityOffboarding:    NewEntityOffboardingClient(cfg),
 		EntityTemplate:       NewEntityTemplateClient(cfg),
 		EntityType:           NewEntityTypeClient(cfg),
 		Export:               NewExportClient(cfg),
@@ -283,9 +289,9 @@ func (c *Client) Close() error {
 func (c *Client) Use(hooks ...Hook) {
 	for _, n := range []interface{ Use(...Hook) }{
 		c.APIKey, c.Attachment, c.AuthRoles, c.AuthTokens, c.Entity, c.EntityField,
-		c.EntityTemplate, c.EntityType, c.Export, c.Group, c.GroupInvitationToken,
-		c.MaintenanceEntry, c.Notifier, c.PasswordResetTokens, c.Tag, c.TemplateField,
-		c.User, c.UserGroup,
+		c.EntityOffboarding, c.EntityTemplate, c.EntityType, c.Export, c.Group,
+		c.GroupInvitationToken, c.MaintenanceEntry, c.Notifier, c.PasswordResetTokens,
+		c.Tag, c.TemplateField, c.User, c.UserGroup,
 	} {
 		n.Use(hooks...)
 	}
@@ -296,9 +302,9 @@ func (c *Client) Use(hooks ...Hook) {
 func (c *Client) Intercept(interceptors ...Interceptor) {
 	for _, n := range []interface{ Intercept(...Interceptor) }{
 		c.APIKey, c.Attachment, c.AuthRoles, c.AuthTokens, c.Entity, c.EntityField,
-		c.EntityTemplate, c.EntityType, c.Export, c.Group, c.GroupInvitationToken,
-		c.MaintenanceEntry, c.Notifier, c.PasswordResetTokens, c.Tag, c.TemplateField,
-		c.User, c.UserGroup,
+		c.EntityOffboarding, c.EntityTemplate, c.EntityType, c.Export, c.Group,
+		c.GroupInvitationToken, c.MaintenanceEntry, c.Notifier, c.PasswordResetTokens,
+		c.Tag, c.TemplateField, c.User, c.UserGroup,
 	} {
 		n.Intercept(interceptors...)
 	}
@@ -319,6 +325,8 @@ func (c *Client) Mutate(ctx context.Context, m Mutation) (Value, error) {
 		return c.Entity.mutate(ctx, m)
 	case *EntityFieldMutation:
 		return c.EntityField.mutate(ctx, m)
+	case *EntityOffboardingMutation:
+		return c.EntityOffboarding.mutate(ctx, m)
 	case *EntityTemplateMutation:
 		return c.EntityTemplate.mutate(ctx, m)
 	case *EntityTypeMutation:
@@ -1180,6 +1188,22 @@ func (c *EntityClient) QueryFields(_m *Entity) *EntityFieldQuery {
 	return query
 }
 
+// QueryOffboardingRecords queries the offboarding_records edge of a Entity.
+func (c *EntityClient) QueryOffboardingRecords(_m *Entity) *EntityOffboardingQuery {
+	query := (&EntityOffboardingClient{config: c.config}).Query()
+	query.path = func(context.Context) (fromV *sql.Selector, _ error) {
+		id := _m.ID
+		step := sqlgraph.NewStep(
+			sqlgraph.From(entity.Table, entity.FieldID, id),
+			sqlgraph.To(entityoffboarding.Table, entityoffboarding.FieldID),
+			sqlgraph.Edge(sqlgraph.O2M, false, entity.OffboardingRecordsTable, entity.OffboardingRecordsColumn),
+		)
+		fromV = sqlgraph.Neighbors(_m.driver.Dialect(), step)
+		return fromV, nil
+	}
+	return query
+}
+
 // QueryMaintenanceEntries queries the maintenance_entries edge of a Entity.
 func (c *EntityClient) QueryMaintenanceEntries(_m *Entity) *MaintenanceEntryQuery {
 	query := (&MaintenanceEntryClient{config: c.config}).Query()
@@ -1383,6 +1407,155 @@ func (c *EntityFieldClient) mutate(ctx context.Context, m *EntityFieldMutation) 
 		return (&EntityFieldDelete{config: c.config, hooks: c.Hooks(), mutation: m}).Exec(ctx)
 	default:
 		return nil, fmt.Errorf("ent: unknown EntityField mutation op: %q", m.Op())
+	}
+}
+
+// EntityOffboardingClient is a client for the EntityOffboarding schema.
+type EntityOffboardingClient struct {
+	config
+}
+
+// NewEntityOffboardingClient returns a client for the EntityOffboarding from the given config.
+func NewEntityOffboardingClient(c config) *EntityOffboardingClient {
+	return &EntityOffboardingClient{config: c}
+}
+
+// Use adds a list of mutation hooks to the hooks stack.
+// A call to `Use(f, g, h)` equals to `entityoffboarding.Hooks(f(g(h())))`.
+func (c *EntityOffboardingClient) Use(hooks ...Hook) {
+	c.hooks.EntityOffboarding = append(c.hooks.EntityOffboarding, hooks...)
+}
+
+// Intercept adds a list of query interceptors to the interceptors stack.
+// A call to `Intercept(f, g, h)` equals to `entityoffboarding.Intercept(f(g(h())))`.
+func (c *EntityOffboardingClient) Intercept(interceptors ...Interceptor) {
+	c.inters.EntityOffboarding = append(c.inters.EntityOffboarding, interceptors...)
+}
+
+// Create returns a builder for creating a EntityOffboarding entity.
+func (c *EntityOffboardingClient) Create() *EntityOffboardingCreate {
+	mutation := newEntityOffboardingMutation(c.config, OpCreate)
+	return &EntityOffboardingCreate{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// CreateBulk returns a builder for creating a bulk of EntityOffboarding entities.
+func (c *EntityOffboardingClient) CreateBulk(builders ...*EntityOffboardingCreate) *EntityOffboardingCreateBulk {
+	return &EntityOffboardingCreateBulk{config: c.config, builders: builders}
+}
+
+// MapCreateBulk creates a bulk creation builder from the given slice. For each item in the slice, the function creates
+// a builder and applies setFunc on it.
+func (c *EntityOffboardingClient) MapCreateBulk(slice any, setFunc func(*EntityOffboardingCreate, int)) *EntityOffboardingCreateBulk {
+	rv := reflect.ValueOf(slice)
+	if rv.Kind() != reflect.Slice {
+		return &EntityOffboardingCreateBulk{err: fmt.Errorf("calling to EntityOffboardingClient.MapCreateBulk with wrong type %T, need slice", slice)}
+	}
+	builders := make([]*EntityOffboardingCreate, rv.Len())
+	for i := 0; i < rv.Len(); i++ {
+		builders[i] = c.Create()
+		setFunc(builders[i], i)
+	}
+	return &EntityOffboardingCreateBulk{config: c.config, builders: builders}
+}
+
+// Update returns an update builder for EntityOffboarding.
+func (c *EntityOffboardingClient) Update() *EntityOffboardingUpdate {
+	mutation := newEntityOffboardingMutation(c.config, OpUpdate)
+	return &EntityOffboardingUpdate{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// UpdateOne returns an update builder for the given entity.
+func (c *EntityOffboardingClient) UpdateOne(_m *EntityOffboarding) *EntityOffboardingUpdateOne {
+	mutation := newEntityOffboardingMutation(c.config, OpUpdateOne, withEntityOffboarding(_m))
+	return &EntityOffboardingUpdateOne{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// UpdateOneID returns an update builder for the given id.
+func (c *EntityOffboardingClient) UpdateOneID(id uuid.UUID) *EntityOffboardingUpdateOne {
+	mutation := newEntityOffboardingMutation(c.config, OpUpdateOne, withEntityOffboardingID(id))
+	return &EntityOffboardingUpdateOne{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// Delete returns a delete builder for EntityOffboarding.
+func (c *EntityOffboardingClient) Delete() *EntityOffboardingDelete {
+	mutation := newEntityOffboardingMutation(c.config, OpDelete)
+	return &EntityOffboardingDelete{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// DeleteOne returns a builder for deleting the given entity.
+func (c *EntityOffboardingClient) DeleteOne(_m *EntityOffboarding) *EntityOffboardingDeleteOne {
+	return c.DeleteOneID(_m.ID)
+}
+
+// DeleteOneID returns a builder for deleting the given entity by its id.
+func (c *EntityOffboardingClient) DeleteOneID(id uuid.UUID) *EntityOffboardingDeleteOne {
+	builder := c.Delete().Where(entityoffboarding.ID(id))
+	builder.mutation.id = &id
+	builder.mutation.op = OpDeleteOne
+	return &EntityOffboardingDeleteOne{builder}
+}
+
+// Query returns a query builder for EntityOffboarding.
+func (c *EntityOffboardingClient) Query() *EntityOffboardingQuery {
+	return &EntityOffboardingQuery{
+		config: c.config,
+		ctx:    &QueryContext{Type: TypeEntityOffboarding},
+		inters: c.Interceptors(),
+	}
+}
+
+// Get returns a EntityOffboarding entity by its id.
+func (c *EntityOffboardingClient) Get(ctx context.Context, id uuid.UUID) (*EntityOffboarding, error) {
+	return c.Query().Where(entityoffboarding.ID(id)).Only(ctx)
+}
+
+// GetX is like Get, but panics if an error occurs.
+func (c *EntityOffboardingClient) GetX(ctx context.Context, id uuid.UUID) *EntityOffboarding {
+	obj, err := c.Get(ctx, id)
+	if err != nil {
+		panic(err)
+	}
+	return obj
+}
+
+// QueryEntity queries the entity edge of a EntityOffboarding.
+func (c *EntityOffboardingClient) QueryEntity(_m *EntityOffboarding) *EntityQuery {
+	query := (&EntityClient{config: c.config}).Query()
+	query.path = func(context.Context) (fromV *sql.Selector, _ error) {
+		id := _m.ID
+		step := sqlgraph.NewStep(
+			sqlgraph.From(entityoffboarding.Table, entityoffboarding.FieldID, id),
+			sqlgraph.To(entity.Table, entity.FieldID),
+			sqlgraph.Edge(sqlgraph.M2O, true, entityoffboarding.EntityTable, entityoffboarding.EntityColumn),
+		)
+		fromV = sqlgraph.Neighbors(_m.driver.Dialect(), step)
+		return fromV, nil
+	}
+	return query
+}
+
+// Hooks returns the client hooks.
+func (c *EntityOffboardingClient) Hooks() []Hook {
+	return c.hooks.EntityOffboarding
+}
+
+// Interceptors returns the client interceptors.
+func (c *EntityOffboardingClient) Interceptors() []Interceptor {
+	return c.inters.EntityOffboarding
+}
+
+func (c *EntityOffboardingClient) mutate(ctx context.Context, m *EntityOffboardingMutation) (Value, error) {
+	switch m.Op() {
+	case OpCreate:
+		return (&EntityOffboardingCreate{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpUpdate:
+		return (&EntityOffboardingUpdate{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpUpdateOne:
+		return (&EntityOffboardingUpdateOne{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpDelete, OpDeleteOne:
+		return (&EntityOffboardingDelete{config: c.config, hooks: c.Hooks(), mutation: m}).Exec(ctx)
+	default:
+		return nil, fmt.Errorf("ent: unknown EntityOffboarding mutation op: %q", m.Op())
 	}
 }
 
@@ -3480,13 +3653,15 @@ func (c *UserGroupClient) mutate(ctx context.Context, m *UserGroupMutation) (Val
 // hooks and interceptors per client, for fast access.
 type (
 	hooks struct {
-		APIKey, Attachment, AuthRoles, AuthTokens, Entity, EntityField, EntityTemplate,
-		EntityType, Export, Group, GroupInvitationToken, MaintenanceEntry, Notifier,
-		PasswordResetTokens, Tag, TemplateField, User, UserGroup []ent.Hook
+		APIKey, Attachment, AuthRoles, AuthTokens, Entity, EntityField,
+		EntityOffboarding, EntityTemplate, EntityType, Export, Group,
+		GroupInvitationToken, MaintenanceEntry, Notifier, PasswordResetTokens, Tag,
+		TemplateField, User, UserGroup []ent.Hook
 	}
 	inters struct {
-		APIKey, Attachment, AuthRoles, AuthTokens, Entity, EntityField, EntityTemplate,
-		EntityType, Export, Group, GroupInvitationToken, MaintenanceEntry, Notifier,
-		PasswordResetTokens, Tag, TemplateField, User, UserGroup []ent.Interceptor
+		APIKey, Attachment, AuthRoles, AuthTokens, Entity, EntityField,
+		EntityOffboarding, EntityTemplate, EntityType, Export, Group,
+		GroupInvitationToken, MaintenanceEntry, Notifier, PasswordResetTokens, Tag,
+		TemplateField, User, UserGroup []ent.Interceptor
 	}
 )

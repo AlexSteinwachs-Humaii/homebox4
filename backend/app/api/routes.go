@@ -209,6 +209,9 @@ func (a *app) mountRoutes(r *chi.Mux, chain *errchain.ErrChain, repos *repo.AllR
 		r.Get("/entities/tree", chain.ToHandlerFunc(v1Ctrl.HandleLocationTreeQuery(), userMW...))
 
 		r.Get("/entities/{id}", chain.ToHandlerFunc(v1Ctrl.HandleEntityGet(), userMW...))
+		r.Get("/entities/{id}/offboarding-history", chain.ToHandlerFunc(v1Ctrl.HandleEntityOffboardingHistory(), userMW...))
+		r.Post("/entities/{id}/offboard", chain.ToHandlerFunc(v1Ctrl.HandleEntityOffboard(), userMW...))
+		r.Post("/entities/{id}/reactivate", chain.ToHandlerFunc(v1Ctrl.HandleEntityReactivate(), userMW...))
 		r.Get("/entities/{id}/path", chain.ToHandlerFunc(v1Ctrl.HandleEntityFullPath(), userMW...))
 		r.Put("/entities/{id}", chain.ToHandlerFunc(v1Ctrl.HandleEntityUpdate(), userMW...))
 		r.Patch("/entities/{id}", chain.ToHandlerFunc(v1Ctrl.HandleEntityPatch(), userMW...))

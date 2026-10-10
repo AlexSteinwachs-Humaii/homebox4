@@ -438,6 +438,7 @@
         "api_failure": "Backend API call failed: "
     },
     "global": {
+        "more_actions": "More actions",
         "add": "Add",
         "archived": "Archived",
         "build": "Build: { build }",
@@ -548,6 +549,36 @@
         }
     },
     "items": {
+        "lifecycle": {
+            "offboard": "Offboard",
+            "reactivate": "Reactivate",
+            "offboarded": "Offboarded",
+            "active": "Active",
+            "all": "All lifecycle states",
+            "filter": "Lifecycle",
+            "history": "Offboarding history",
+            "outcome": "Outcome",
+            "reason": "Custom reason (required)",
+            "date": "Offboarding date (required)",
+            "notes": "Notes (optional)",
+            "reactivated": "Reactivated",
+            "saving": "Saving…",
+            "offboard_help": "Remove this asset from active inventory while retaining its details and history.",
+            "reactivate_help": "Return this asset to active use without removing its history. Archived assets remain archived.",
+            "failed": "Unable to save the lifecycle change. Check your connection and permissions, then try again.",
+            "invalid_outcome": "Select a supported outcome.",
+            "invalid_date": "Enter a valid offboarding date.",
+            "reason_required": "Enter a custom reason.",
+            "too_long": "Use at most 255 characters for the reason and 1000 for notes.",
+            "outcomes": {
+                "sold": "Sold",
+                "donated": "Donated",
+                "disposed": "Disposed",
+                "recycled": "Recycled",
+                "lost": "Lost",
+                "custom": "Custom"
+            }
+        },
         "add": "Add",
         "advanced": "Advanced",
         "archived": "Archived",

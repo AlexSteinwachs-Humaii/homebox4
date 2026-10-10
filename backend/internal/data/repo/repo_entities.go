@@ -16,6 +16,7 @@ import (
 	"github.com/sysadminsmedia/homebox/backend/internal/data/ent/attachment"
 	"github.com/sysadminsmedia/homebox/backend/internal/data/ent/entity"
 	"github.com/sysadminsmedia/homebox/backend/internal/data/ent/entityfield"
+	"github.com/sysadminsmedia/homebox/backend/internal/data/ent/entityoffboarding"
 	"github.com/sysadminsmedia/homebox/backend/internal/data/ent/entitytype"
 	"github.com/sysadminsmedia/homebox/backend/internal/data/ent/group"
 	"github.com/sysadminsmedia/homebox/backend/internal/data/ent/maintenanceentry"
@@ -68,6 +69,7 @@ type (
 		OnlyWithoutPhoto bool    `json:"onlyWithoutPhoto"`
 		OnlyWithPhoto    bool    `json:"onlyWithPhoto"`
 		IncludeArchived  bool    `json:"includeArchived"`
+		Lifecycle        string  `json:"lifecycle"`      // active (default), all, or offboarded; independent of archive
 		FilterChildren   bool    `json:"filterChildren"` // when true, only return root entities (no parent)
 	}
 
@@ -105,6 +107,8 @@ type (
 		TagIDs []uuid.UUID `json:"tagIds"`
 	}
 
+	// EntityUpdate intentionally excludes lifecycle state and history. Full edits
+	// (including stale payloads) must use the dedicated lifecycle transitions.
 	EntityUpdate struct {
 		WarrantyExpires types.Date `json:"warrantyExpires"`
 		// Purchase
@@ -140,6 +144,7 @@ type (
 		LifetimeWarranty bool `json:"lifetimeWarranty"`
 	}
 
+	// EntityPatch is also used by CSV imports; it must not write lifecycle state.
 	EntityPatch struct {
 		ID           uuid.UUID   `json:"id"`
 		Quantity     *float64    `json:"quantity,omitempty" extensions:"x-nullable,x-omitempty"`
@@ -158,6 +163,7 @@ type (
 		Quantity    float64   `json:"quantity"`
 		Insured     bool      `json:"insured"`
 		Archived    bool      `json:"archived"`
+		Offboarded  bool      `json:"offboarded"`
 		CreatedAt   time.Time `json:"createdAt"`
 		UpdatedAt   time.Time `json:"updatedAt"`
 
@@ -179,7 +185,8 @@ type (
 	}
 
 	EntityOut struct {
-		Parent *EntitySummary `json:"parent,omitempty" extensions:"x-nullable,x-omitempty"`
+		OffboardingHistory []EntityOffboardingRecord `json:"offboardingHistory"`
+		Parent             *EntitySummary            `json:"parent,omitempty" extensions:"x-nullable,x-omitempty"`
 		// Location is the nearest ancestor whose entity type is a location.
 		// When the direct parent is already a location it equals Parent; when
 		// the entity is nested inside other items it is the location those
@@ -267,6 +274,7 @@ func mapEntitySummary(e *ent.Entity) EntitySummary {
 		CreatedAt:     e.CreatedAt,
 		UpdatedAt:     e.UpdatedAt,
 		Archived:      e.Archived,
+		Offboarded:    e.Offboarded,
 		PurchasePrice: e.PurchasePrice,
 
 		// Edges
@@ -334,6 +342,7 @@ func mapEntityOut(e *ent.Entity) EntityOut {
 		Parent:                   parent,
 		AssetID:                  AssetID(e.AssetID),
 		EntitySummary:            mapEntitySummary(e),
+		OffboardingHistory:       mapOffboardingHistory(e.Edges.OffboardingRecords),
 		LifetimeWarranty:         e.LifetimeWarranty,
 		WarrantyExpires:          types.DateFromDBTime(e.WarrantyExpires),
 		WarrantyDetails:          e.WarrantyDetails,
@@ -432,6 +441,9 @@ func (r *EntityRepository) getOneTx(ctx context.Context, tx *ent.Tx, where ...pr
 	}
 
 	e, err := q.
+		WithOffboardingRecords(func(q *ent.EntityOffboardingQuery) {
+			q.Order(ent.Asc(entityoffboarding.FieldCreatedAt), ent.Asc(entityoffboarding.FieldID))
+		}).
 		WithFields().
 		WithTag().
 		WithParent(func(eq *ent.EntityQuery) {
@@ -599,9 +611,19 @@ func (r *EntityRepository) QueryByGroup(ctx context.Context, gid uuid.UUID, q En
 		trace.WithAttributes(entityQuerySpanAttrs(gid, q)...))
 	defer span.End()
 
+	if err := ValidateLifecycleFilter(q.Lifecycle); err != nil {
+		return PaginationResult[EntitySummary]{}, err
+	}
 	qb := r.db.Entity.Query().Where(
 		entity.HasGroupWith(group.ID(gid)),
 	)
+	switch q.Lifecycle {
+	case "offboarded":
+		qb.Where(entity.Offboarded(true), entity.Not(entity.HasEntityTypeWith(entitytype.IsLocation(true))))
+	case "all":
+	default:
+		qb.Where(entity.Offboarded(false))
+	}
 
 	// Filter by entity type (location vs item) when specified.
 	// Default (nil) = items only (excludes locations for backward compat)
@@ -755,6 +777,10 @@ func (r *EntityRepository) QueryByGroup(ctx context.Context, gid uuid.UUID, q En
 		qb = qb.Order(ent.Asc(entity.FieldName))
 	}
 
+	// Names and timestamps can tie; a unique secondary key keeps lifecycle
+	// pagination stable so assets are neither repeated nor skipped across pages.
+	qb = qb.Order(ent.Asc(entity.FieldID))
+
 	qb = qb.
 		WithTag().
 		WithParent().
@@ -842,7 +868,7 @@ func (r *EntityRepository) getChildItemCounts(ctx context.Context, gid uuid.UUID
 		JOIN entity_types et ON et.id = e.entity_type_entities
 		WHERE e.group_entities = $1
 			AND et.is_location = false
-			AND e.archived = false
+			AND e.archived = false AND e.offboarded = false
 			AND e.entity_children IN (%s)
 		GROUP BY e.entity_children
 	`, strings.Join(placeholders, ","))
@@ -2233,6 +2259,8 @@ func (r *EntityRepository) Duplicate(ctx context.Context, gid, id uuid.UUID, opt
 		SetNotes(originalEntity.Notes).
 		SetInsured(originalEntity.Insured).
 		SetArchived(originalEntity.Archived).
+		// A duplicate is a new active asset, not a copy of lifecycle cycles.
+		SetOffboarded(false).
 		SetSyncChildEntityLocations(originalEntity.SyncChildEntityLocations)
 
 	// Skip Set on zero dates so the duplicate's nullable date columns end up
@@ -2412,7 +2440,7 @@ func (r *EntityRepository) GetAllContainers(ctx context.Context, gid uuid.UUID, 
 					entity_types ct ON ct.id = child.entity_type_entities
 				WHERE
 					child.entity_children = e.id
-					AND child.archived = false
+					AND child.archived = false AND child.offboarded = false
 					AND ct.is_location = false
 			) as item_count
 		FROM
@@ -2816,6 +2844,7 @@ func (r *EntityRepository) Tree(ctx context.Context, gid uuid.UUID, tq TreeQuery
 			FROM    entities e
 			JOIN    entity_types et ON et.id = e.entity_type_entities
 			WHERE   et.is_location = false
+			AND e.offboarded = false AND e.archived = false AND e.group_entities = $1
 			AND     e.entity_children IN (SELECT id FROM entity_tree)
 
 			UNION ALL
@@ -2830,6 +2859,7 @@ func (r *EntityRepository) Tree(ctx context.Context, gid uuid.UUID, tq TreeQuery
 			JOIN    item_tree p
 			ON      c.entity_children = p.id
 			WHERE   ct.is_location = false
+			AND c.offboarded = false AND c.archived = false AND c.group_entities = $1
 			AND     level < 10 -- prevent infinite loop & excessive recursion
 		)`
 

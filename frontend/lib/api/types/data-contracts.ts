@@ -49,6 +49,15 @@ export enum ExportKind {
   KindImport = "import",
 }
 
+export enum EntityoffboardingOutcome {
+  OutcomeSold = "sold",
+  OutcomeDonated = "donated",
+  OutcomeDisposed = "disposed",
+  OutcomeRecycled = "recycled",
+  OutcomeLost = "lost",
+  OutcomeCustom = "custom",
+}
+
 export enum EntityfieldType {
   TypeText = "text",
   TypeNumber = "number",
@@ -211,6 +220,8 @@ export interface EntEntity {
   name: string;
   /** Notes holds the value of the "notes" field. */
   notes: string;
+  /** Offboarded holds the value of the "offboarded" field. */
+  offboarded: boolean;
   /** PurchaseDate holds the value of the "purchase_date" field. */
   purchase_date: Date | string;
   /** PurchaseFrom holds the value of the "purchase_from" field. */
@@ -252,6 +263,8 @@ export interface EntEntityEdges {
   group: EntGroup;
   /** MaintenanceEntries holds the value of the maintenance_entries edge. */
   maintenance_entries: EntMaintenanceEntry[];
+  /** OffboardingRecords holds the value of the offboarding_records edge. */
+  offboarding_records: EntEntityOffboarding[];
   /** Parent holds the value of the parent edge. */
   parent: EntEntity;
   /** Tag holds the value of the tag edge. */
@@ -287,6 +300,37 @@ export interface EntEntityField {
 }
 
 export interface EntEntityFieldEdges {
+  /** Entity holds the value of the entity edge. */
+  entity: EntEntity;
+}
+
+export interface EntEntityOffboarding {
+  /** CreatedAt holds the value of the "created_at" field. */
+  created_at: string;
+  /** CustomReason holds the value of the "custom_reason" field. */
+  custom_reason: string;
+  /**
+   * Edges holds the relations/edges for other nodes in the graph.
+   * The values are being populated by the EntityOffboardingQuery when eager-loading is set.
+   */
+  edges: EntEntityOffboardingEdges;
+  /** EffectiveDate holds the value of the "effective_date" field. */
+  effective_date: Date | string;
+  /** EntityID holds the value of the "entity_id" field. */
+  entity_id: string;
+  /** ID of the ent. */
+  id: string;
+  /** Notes holds the value of the "notes" field. */
+  notes: string;
+  /** Outcome holds the value of the "outcome" field. */
+  outcome: EntityoffboardingOutcome;
+  /** ReactivatedAt holds the value of the "reactivated_at" field. */
+  reactivated_at: string;
+  /** UpdatedAt holds the value of the "updated_at" field. */
+  updated_at: string;
+}
+
+export interface EntEntityOffboardingEdges {
   /** Entity holds the value of the entity edge. */
   entity: EntEntity;
 }
@@ -781,6 +825,16 @@ export interface EntityListResult {
   totalPrice: number;
 }
 
+export interface EntityOffboardingRecord {
+  createdAt: Date | string;
+  customReason: string;
+  effectiveDate: string;
+  id: string;
+  notes: string;
+  outcome: string;
+  reactivatedAt?: string | null;
+}
+
 export interface EntityOut {
   archived: boolean;
   /** @example "0" */
@@ -811,6 +865,8 @@ export interface EntityOut {
   name: string;
   /** Extras */
   notes: string;
+  offboarded: boolean;
+  offboardingHistory: EntityOffboardingRecord[];
   /** Edges */
   parent?: EntitySummary | null;
   /** Purchase */
@@ -860,6 +916,7 @@ export interface EntitySummary {
   /** Container-specific (populated when querying locations) */
   itemCount: number;
   name: string;
+  offboarded: boolean;
   /** Edges */
   parent?: EntitySummary | null;
   purchasePrice: number;
@@ -1354,6 +1411,14 @@ export interface ChangePassword {
 
 export interface CreateRequest {
   name: string;
+}
+
+export interface EntityOffboardRequest {
+  customReason: string;
+  /** @example "2026-10-09" */
+  effectiveDate: string;
+  notes: string;
+  outcome: "sold" | "donated" | "disposed" | "recycled" | "lost" | "custom";
 }
 
 export interface EntityTemplateCreateItemRequest {

@@ -24,6 +24,8 @@ type Tx struct {
 	Entity *EntityClient
 	// EntityField is the client for interacting with the EntityField builders.
 	EntityField *EntityFieldClient
+	// EntityOffboarding is the client for interacting with the EntityOffboarding builders.
+	EntityOffboarding *EntityOffboardingClient
 	// EntityTemplate is the client for interacting with the EntityTemplate builders.
 	EntityTemplate *EntityTemplateClient
 	// EntityType is the client for interacting with the EntityType builders.
@@ -185,6 +187,7 @@ func (tx *Tx) init() {
 	tx.AuthTokens = NewAuthTokensClient(tx.config)
 	tx.Entity = NewEntityClient(tx.config)
 	tx.EntityField = NewEntityFieldClient(tx.config)
+	tx.EntityOffboarding = NewEntityOffboardingClient(tx.config)
 	tx.EntityTemplate = NewEntityTemplateClient(tx.config)
 	tx.EntityType = NewEntityTypeClient(tx.config)
 	tx.Export = NewExportClient(tx.config)

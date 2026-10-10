@@ -2,7 +2,9 @@ import { defineConfig, devices } from "@playwright/test";
 import { fileURLToPath } from "node:url";
 
 export default defineConfig({
-  testDir: "./e2e",
+  // The upgrade workflow supplies TEST_DATA_FILE and passes an upgrade spec.
+  // Keep those seeded tests out of ordinary E2E runs without changing the workflow.
+  testDir: process.env.TEST_DATA_FILE ? "./upgrade" : "./e2e",
   fullyParallel: true,
   forbidOnly: !!process.env.CI,
   retries: process.env.CI ? 2 : 1,

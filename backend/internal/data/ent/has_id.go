@@ -28,6 +28,10 @@ func (_m *EntityField) GetID() uuid.UUID {
 	return _m.ID
 }
 
+func (_m *EntityOffboarding) GetID() uuid.UUID {
+	return _m.ID
+}
+
 func (_m *EntityTemplate) GetID() uuid.UUID {
 	return _m.ID
 }

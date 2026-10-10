@@ -16,6 +16,7 @@ import (
 	"github.com/sysadminsmedia/homebox/backend/internal/data/ent/attachment"
 	"github.com/sysadminsmedia/homebox/backend/internal/data/ent/entity"
 	"github.com/sysadminsmedia/homebox/backend/internal/data/ent/entityfield"
+	"github.com/sysadminsmedia/homebox/backend/internal/data/ent/entityoffboarding"
 	"github.com/sysadminsmedia/homebox/backend/internal/data/ent/entitytype"
 	"github.com/sysadminsmedia/homebox/backend/internal/data/ent/group"
 	"github.com/sysadminsmedia/homebox/backend/internal/data/ent/maintenanceentry"
@@ -36,6 +37,7 @@ type EntityQuery struct {
 	withTag                *TagQuery
 	withEntityType         *EntityTypeQuery
 	withFields             *EntityFieldQuery
+	withOffboardingRecords *EntityOffboardingQuery
 	withMaintenanceEntries *MaintenanceEntryQuery
 	withAttachments        *AttachmentQuery
 	withFKs                bool
@@ -200,6 +202,28 @@ func (_q *EntityQuery) QueryFields() *EntityFieldQuery {
 			sqlgraph.From(entity.Table, entity.FieldID, selector),
 			sqlgraph.To(entityfield.Table, entityfield.FieldID),
 			sqlgraph.Edge(sqlgraph.O2M, false, entity.FieldsTable, entity.FieldsColumn),
+		)
+		fromU = sqlgraph.SetNeighbors(_q.driver.Dialect(), step)
+		return fromU, nil
+	}
+	return query
+}
+
+// QueryOffboardingRecords chains the current query on the "offboarding_records" edge.
+func (_q *EntityQuery) QueryOffboardingRecords() *EntityOffboardingQuery {
+	query := (&EntityOffboardingClient{config: _q.config}).Query()
+	query.path = func(ctx context.Context) (fromU *sql.Selector, err error) {
+		if err := _q.prepareQuery(ctx); err != nil {
+			return nil, err
+		}
+		selector := _q.sqlQuery(ctx)
+		if err := selector.Err(); err != nil {
+			return nil, err
+		}
+		step := sqlgraph.NewStep(
+			sqlgraph.From(entity.Table, entity.FieldID, selector),
+			sqlgraph.To(entityoffboarding.Table, entityoffboarding.FieldID),
+			sqlgraph.Edge(sqlgraph.O2M, false, entity.OffboardingRecordsTable, entity.OffboardingRecordsColumn),
 		)
 		fromU = sqlgraph.SetNeighbors(_q.driver.Dialect(), step)
 		return fromU, nil
@@ -449,6 +473,7 @@ func (_q *EntityQuery) Clone() *EntityQuery {
 		withTag:                _q.withTag.Clone(),
 		withEntityType:         _q.withEntityType.Clone(),
 		withFields:             _q.withFields.Clone(),
+		withOffboardingRecords: _q.withOffboardingRecords.Clone(),
 		withMaintenanceEntries: _q.withMaintenanceEntries.Clone(),
 		withAttachments:        _q.withAttachments.Clone(),
 		// clone intermediate query.
@@ -520,6 +545,17 @@ func (_q *EntityQuery) WithFields(opts ...func(*EntityFieldQuery)) *EntityQuery 
 		opt(query)
 	}
 	_q.withFields = query
+	return _q
+}
+
+// WithOffboardingRecords tells the query-builder to eager-load the nodes that are connected to
+// the "offboarding_records" edge. The optional arguments are used to configure the query builder of the edge.
+func (_q *EntityQuery) WithOffboardingRecords(opts ...func(*EntityOffboardingQuery)) *EntityQuery {
+	query := (&EntityOffboardingClient{config: _q.config}).Query()
+	for _, opt := range opts {
+		opt(query)
+	}
+	_q.withOffboardingRecords = query
 	return _q
 }
 
@@ -624,13 +660,14 @@ func (_q *EntityQuery) sqlAll(ctx context.Context, hooks ...queryHook) ([]*Entit
 		nodes       = []*Entity{}
 		withFKs     = _q.withFKs
 		_spec       = _q.querySpec()
-		loadedTypes = [8]bool{
+		loadedTypes = [9]bool{
 			_q.withGroup != nil,
 			_q.withParent != nil,
 			_q.withChildren != nil,
 			_q.withTag != nil,
 			_q.withEntityType != nil,
 			_q.withFields != nil,
+			_q.withOffboardingRecords != nil,
 			_q.withMaintenanceEntries != nil,
 			_q.withAttachments != nil,
 		}
@@ -695,6 +732,15 @@ func (_q *EntityQuery) sqlAll(ctx context.Context, hooks ...queryHook) ([]*Entit
 		if err := _q.loadFields(ctx, query, nodes,
 			func(n *Entity) { n.Edges.Fields = []*EntityField{} },
 			func(n *Entity, e *EntityField) { n.Edges.Fields = append(n.Edges.Fields, e) }); err != nil {
+			return nil, err
+		}
+	}
+	if query := _q.withOffboardingRecords; query != nil {
+		if err := _q.loadOffboardingRecords(ctx, query, nodes,
+			func(n *Entity) { n.Edges.OffboardingRecords = []*EntityOffboarding{} },
+			func(n *Entity, e *EntityOffboarding) {
+				n.Edges.OffboardingRecords = append(n.Edges.OffboardingRecords, e)
+			}); err != nil {
 			return nil, err
 		}
 	}
@@ -931,6 +977,36 @@ func (_q *EntityQuery) loadFields(ctx context.Context, query *EntityFieldQuery, 
 		node, ok := nodeids[*fk]
 		if !ok {
 			return fmt.Errorf(`unexpected referenced foreign-key "entity_fields" returned %v for node %v`, *fk, n.ID)
+		}
+		assign(node, n)
+	}
+	return nil
+}
+func (_q *EntityQuery) loadOffboardingRecords(ctx context.Context, query *EntityOffboardingQuery, nodes []*Entity, init func(*Entity), assign func(*Entity, *EntityOffboarding)) error {
+	fks := make([]driver.Value, 0, len(nodes))
+	nodeids := make(map[uuid.UUID]*Entity)
+	for i := range nodes {
+		fks = append(fks, nodes[i].ID)
+		nodeids[nodes[i].ID] = nodes[i]
+		if init != nil {
+			init(nodes[i])
+		}
+	}
+	if len(query.ctx.Fields) > 0 {
+		query.ctx.AppendFieldOnce(entityoffboarding.FieldEntityID)
+	}
+	query.Where(predicate.EntityOffboarding(func(s *sql.Selector) {
+		s.Where(sql.InValues(s.C(entity.OffboardingRecordsColumn), fks...))
+	}))
+	neighbors, err := query.All(ctx)
+	if err != nil {
+		return err
+	}
+	for _, n := range neighbors {
+		fk := n.EntityID
+		node, ok := nodeids[fk]
+		if !ok {
+			return fmt.Errorf(`unexpected referenced foreign-key "entity_id" returned %v for node %v`, fk, n.ID)
 		}
 		assign(node, n)
 	}

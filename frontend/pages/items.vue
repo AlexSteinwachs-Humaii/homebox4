@@ -32,6 +32,9 @@
   const searchLocked = ref(false);
   const queryParamsInitialized = ref(false);
   const initialSearch = ref(true);
+  onBeforeRouteLeave(() => {
+    searchLocked.value = true;
+  });
 
   const api = useUserApi();
   const loading = useMinLoader(500);
@@ -82,6 +85,17 @@
   });
 
   const query = useOptionalRouteQuery("q", "");
+  const lifecycleQuery = useOptionalRouteQuery("lifecycle", "active");
+  const lifecycle = ref<"active" | "all" | "offboarded">(
+    lifecycleQuery.value === "all" || lifecycleQuery.value === "offboarded" ? lifecycleQuery.value : "active"
+  );
+  watch(lifecycle, () => {
+    page.value = 1;
+    search();
+  });
+  onServerEvent(ServerEvent.EntityMutation, () => {
+    search();
+  });
   const includeArchived = useOptionalRouteQuery("archived", false);
   const fieldSelector = useOptionalRouteQuery("fieldSelector", false);
   const negateTags = useOptionalRouteQuery("negateTags", false);
@@ -191,6 +205,7 @@
 
   watch(includeArchived, (newV, oldV) => {
     if (newV !== oldV) {
+      page.value = 1;
       search();
     }
   });
@@ -256,11 +271,15 @@
     return data;
   }
 
+  let searchVersion = 0;
   async function search() {
-    if (searchLocked.value) {
+    if (searchLocked.value || route.path !== "/items") {
       return;
     }
 
+    // A slower response for an earlier lifecycle/page must not replace the
+    // results and counts for the currently selected inventory filter.
+    const version = ++searchVersion;
     loading.value = true;
 
     const fields = [];
@@ -272,6 +291,7 @@
     }
 
     const push_query: Record<string, string | string[] | number | boolean | undefined> = {
+      lifecycle: lifecycle.value,
       archived: includeArchived.value,
       fieldSelector: fieldSelector.value,
       negateTags: negateTags.value,
@@ -306,6 +326,7 @@
     }
 
     await router.push({ query: push_query as LocationQueryRaw });
+    if (version !== searchVersion || searchLocked.value || route.path !== "/items") return;
 
     const { data, error } = await api.items.getAll({
       q: query.value || "",
@@ -314,12 +335,15 @@
       negateTags: negateTags.value,
       onlyWithoutPhoto: onlyWithoutPhoto.value,
       onlyWithPhoto: onlyWithPhoto.value,
+      lifecycle: lifecycle.value,
       includeArchived: includeArchived.value,
       page: page.value,
       pageSize: pageSize.value,
       orderBy: orderBy.value,
       fields,
     });
+
+    if (version !== searchVersion || searchLocked.value || route.path !== "/items") return;
 
     function resetItems() {
       page.value = Math.max(1, page.value - 1);
@@ -334,13 +358,13 @@
       return;
     }
 
-    if (!data.items || data.items.length === 0) {
-      resetItems();
-      return;
-    }
-
+    // Keep the server's filtered total even when this page is empty (for
+    // example after an asset is offboarded while viewing the last page).
     total.value = data.total;
-    items.value = data.items;
+    items.value = data.items ?? [];
+    if (items.value.length === 0 && page.value > 1) {
+      page.value = Math.max(1, Math.ceil(data.total / pageSize.value));
+    }
 
     loading.value = false;
     initialSearch.value = false;
@@ -406,6 +430,20 @@
       <div class="flex w-full flex-wrap gap-2 py-2 md:flex-nowrap">
         <SearchFilter v-model="selectedLocations" :label="$t('global.locations')" :options="locationFlatTree" />
         <SearchFilter v-model="selectedTags" :label="$t('global.tags')" :options="tags" />
+        <div class="flex items-center gap-2">
+          <Label for="inventory-lifecycle">{{ $t("items.lifecycle.filter") }}</Label>
+          <select
+            id="inventory-lifecycle"
+            v-model="lifecycle"
+            class="h-9 rounded-md border border-input bg-background px-2 text-sm"
+          >
+            <option value="active">{{ $t("items.lifecycle.active") }}</option>
+            <option value="all">{{ $t("items.lifecycle.all") }}</option>
+            <option value="offboarded">
+              {{ $t("items.lifecycle.offboarded") }}
+            </option>
+          </select>
+        </div>
         <Popover>
           <PopoverTrigger as-child>
             <Button size="sm" variant="outline"> {{ $t("items.options") }}</Button>
@@ -414,7 +452,9 @@
             <Label class="flex cursor-pointer items-center">
               <Switch v-model="includeArchived" class="ml-auto" />
               <div class="grow" />
-              <span class="text-right"> {{ $t("items.include_archive") }} </span>
+              <span class="text-right">
+                {{ $t("items.include_archive") }}
+              </span>
             </Label>
             <Label class="flex cursor-pointer items-center">
               <Switch v-model="fieldSelector" class="ml-auto" />
@@ -429,12 +469,16 @@
             <Label class="flex cursor-pointer items-center">
               <Switch v-model="onlyWithoutPhoto" class="ml-auto" />
               <div class="grow" />
-              <span class="text-right"> {{ $t("items.only_without_photo") }} </span>
+              <span class="text-right">
+                {{ $t("items.only_without_photo") }}
+              </span>
             </Label>
             <Label class="flex cursor-pointer items-center">
               <Switch v-model="onlyWithPhoto" class="ml-auto" />
               <div class="grow" />
-              <span class="text-right"> {{ $t("items.only_with_photo") }} </span>
+              <span class="text-right">
+                {{ $t("items.only_with_photo") }}
+              </span>
             </Label>
             <Label class="flex cursor-pointer flex-col gap-2">
               <span class="text-right">
@@ -447,8 +491,12 @@
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="name"> {{ $t("items.name") }} </SelectItem>
-                  <SelectItem value="createdAt"> {{ $t("items.created_at") }} </SelectItem>
-                  <SelectItem value="updatedAt"> {{ $t("items.updated_at") }} </SelectItem>
+                  <SelectItem value="createdAt">
+                    {{ $t("items.created_at") }}
+                  </SelectItem>
+                  <SelectItem value="updatedAt">
+                    {{ $t("items.updated_at") }}
+                  </SelectItem>
                 </SelectContent>
               </Select>
             </Label>
@@ -487,7 +535,9 @@
                 <SelectValue :placeholder="$t('items.select_field')" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem v-for="field in allFields" :key="field" :value="field"> {{ field }} </SelectItem>
+                <SelectItem v-for="field in allFields" :key="field" :value="field">
+                  {{ field }}
+                </SelectItem>
               </SelectContent>
             </Select>
           </div>

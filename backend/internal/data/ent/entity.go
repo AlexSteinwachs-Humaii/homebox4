@@ -38,6 +38,8 @@ type Entity struct {
 	Insured bool `json:"insured,omitempty"`
 	// Archived holds the value of the "archived" field.
 	Archived bool `json:"archived,omitempty"`
+	// Offboarded holds the value of the "offboarded" field.
+	Offboarded bool `json:"offboarded,omitempty"`
 	// AssetID holds the value of the "asset_id" field.
 	AssetID int64 `json:"asset_id,omitempty"`
 	// SyncChildEntityLocations holds the value of the "sync_child_entity_locations" field.
@@ -91,13 +93,15 @@ type EntityEdges struct {
 	EntityType *EntityType `json:"entity_type,omitempty"`
 	// Fields holds the value of the fields edge.
 	Fields []*EntityField `json:"fields,omitempty"`
+	// OffboardingRecords holds the value of the offboarding_records edge.
+	OffboardingRecords []*EntityOffboarding `json:"offboarding_records,omitempty"`
 	// MaintenanceEntries holds the value of the maintenance_entries edge.
 	MaintenanceEntries []*MaintenanceEntry `json:"maintenance_entries,omitempty"`
 	// Attachments holds the value of the attachments edge.
 	Attachments []*Attachment `json:"attachments,omitempty"`
 	// loadedTypes holds the information for reporting if a
 	// type was loaded (or requested) in eager-loading or not.
-	loadedTypes [8]bool
+	loadedTypes [9]bool
 }
 
 // GroupOrErr returns the Group value or an error if the edge
@@ -160,10 +164,19 @@ func (e EntityEdges) FieldsOrErr() ([]*EntityField, error) {
 	return nil, &NotLoadedError{edge: "fields"}
 }
 
+// OffboardingRecordsOrErr returns the OffboardingRecords value or an error if the edge
+// was not loaded in eager-loading.
+func (e EntityEdges) OffboardingRecordsOrErr() ([]*EntityOffboarding, error) {
+	if e.loadedTypes[6] {
+		return e.OffboardingRecords, nil
+	}
+	return nil, &NotLoadedError{edge: "offboarding_records"}
+}
+
 // MaintenanceEntriesOrErr returns the MaintenanceEntries value or an error if the edge
 // was not loaded in eager-loading.
 func (e EntityEdges) MaintenanceEntriesOrErr() ([]*MaintenanceEntry, error) {
-	if e.loadedTypes[6] {
+	if e.loadedTypes[7] {
 		return e.MaintenanceEntries, nil
 	}
 	return nil, &NotLoadedError{edge: "maintenance_entries"}
@@ -172,7 +185,7 @@ func (e EntityEdges) MaintenanceEntriesOrErr() ([]*MaintenanceEntry, error) {
 // AttachmentsOrErr returns the Attachments value or an error if the edge
 // was not loaded in eager-loading.
 func (e EntityEdges) AttachmentsOrErr() ([]*Attachment, error) {
-	if e.loadedTypes[7] {
+	if e.loadedTypes[8] {
 		return e.Attachments, nil
 	}
 	return nil, &NotLoadedError{edge: "attachments"}
@@ -183,7 +196,7 @@ func (*Entity) scanValues(columns []string) ([]any, error) {
 	values := make([]any, len(columns))
 	for i := range columns {
 		switch columns[i] {
-		case entity.FieldInsured, entity.FieldArchived, entity.FieldSyncChildEntityLocations, entity.FieldLifetimeWarranty:
+		case entity.FieldInsured, entity.FieldArchived, entity.FieldOffboarded, entity.FieldSyncChildEntityLocations, entity.FieldLifetimeWarranty:
 			values[i] = new(sql.NullBool)
 		case entity.FieldQuantity, entity.FieldPurchasePrice, entity.FieldSoldPrice:
 			values[i] = new(sql.NullFloat64)
@@ -275,6 +288,12 @@ func (_m *Entity) assignValues(columns []string, values []any) error {
 				return fmt.Errorf("unexpected type %T for field archived", values[i])
 			} else if value.Valid {
 				_m.Archived = value.Bool
+			}
+		case entity.FieldOffboarded:
+			if value, ok := values[i].(*sql.NullBool); !ok {
+				return fmt.Errorf("unexpected type %T for field offboarded", values[i])
+			} else if value.Valid {
+				_m.Offboarded = value.Bool
 			}
 		case entity.FieldAssetID:
 			if value, ok := values[i].(*sql.NullInt64); !ok {
@@ -430,6 +449,11 @@ func (_m *Entity) QueryFields() *EntityFieldQuery {
 	return NewEntityClient(_m.config).QueryFields(_m)
 }
 
+// QueryOffboardingRecords queries the "offboarding_records" edge of the Entity entity.
+func (_m *Entity) QueryOffboardingRecords() *EntityOffboardingQuery {
+	return NewEntityClient(_m.config).QueryOffboardingRecords(_m)
+}
+
 // QueryMaintenanceEntries queries the "maintenance_entries" edge of the Entity entity.
 func (_m *Entity) QueryMaintenanceEntries() *MaintenanceEntryQuery {
 	return NewEntityClient(_m.config).QueryMaintenanceEntries(_m)
@@ -489,6 +513,9 @@ func (_m *Entity) String() string {
 	builder.WriteString(", ")
 	builder.WriteString("archived=")
 	builder.WriteString(fmt.Sprintf("%v", _m.Archived))
+	builder.WriteString(", ")
+	builder.WriteString("offboarded=")
+	builder.WriteString(fmt.Sprintf("%v", _m.Offboarded))
 	builder.WriteString(", ")
 	builder.WriteString("asset_id=")
 	builder.WriteString(fmt.Sprintf("%v", _m.AssetID))

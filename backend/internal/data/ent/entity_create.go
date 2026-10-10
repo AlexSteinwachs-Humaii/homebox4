@@ -14,6 +14,7 @@ import (
 	"github.com/sysadminsmedia/homebox/backend/internal/data/ent/attachment"
 	"github.com/sysadminsmedia/homebox/backend/internal/data/ent/entity"
 	"github.com/sysadminsmedia/homebox/backend/internal/data/ent/entityfield"
+	"github.com/sysadminsmedia/homebox/backend/internal/data/ent/entityoffboarding"
 	"github.com/sysadminsmedia/homebox/backend/internal/data/ent/entitytype"
 	"github.com/sysadminsmedia/homebox/backend/internal/data/ent/group"
 	"github.com/sysadminsmedia/homebox/backend/internal/data/ent/maintenanceentry"
@@ -141,6 +142,20 @@ func (_c *EntityCreate) SetArchived(v bool) *EntityCreate {
 func (_c *EntityCreate) SetNillableArchived(v *bool) *EntityCreate {
 	if v != nil {
 		_c.SetArchived(*v)
+	}
+	return _c
+}
+
+// SetOffboarded sets the "offboarded" field.
+func (_c *EntityCreate) SetOffboarded(v bool) *EntityCreate {
+	_c.mutation.SetOffboarded(v)
+	return _c
+}
+
+// SetNillableOffboarded sets the "offboarded" field if the given value is not nil.
+func (_c *EntityCreate) SetNillableOffboarded(v *bool) *EntityCreate {
+	if v != nil {
+		_c.SetOffboarded(*v)
 	}
 	return _c
 }
@@ -455,6 +470,21 @@ func (_c *EntityCreate) AddFields(v ...*EntityField) *EntityCreate {
 	return _c.AddFieldIDs(ids...)
 }
 
+// AddOffboardingRecordIDs adds the "offboarding_records" edge to the EntityOffboarding entity by IDs.
+func (_c *EntityCreate) AddOffboardingRecordIDs(ids ...uuid.UUID) *EntityCreate {
+	_c.mutation.AddOffboardingRecordIDs(ids...)
+	return _c
+}
+
+// AddOffboardingRecords adds the "offboarding_records" edges to the EntityOffboarding entity.
+func (_c *EntityCreate) AddOffboardingRecords(v ...*EntityOffboarding) *EntityCreate {
+	ids := make([]uuid.UUID, len(v))
+	for i := range v {
+		ids[i] = v[i].ID
+	}
+	return _c.AddOffboardingRecordIDs(ids...)
+}
+
 // AddMaintenanceEntryIDs adds the "maintenance_entries" edge to the MaintenanceEntry entity by IDs.
 func (_c *EntityCreate) AddMaintenanceEntryIDs(ids ...uuid.UUID) *EntityCreate {
 	_c.mutation.AddMaintenanceEntryIDs(ids...)
@@ -540,6 +570,10 @@ func (_c *EntityCreate) defaults() {
 		v := entity.DefaultArchived
 		_c.mutation.SetArchived(v)
 	}
+	if _, ok := _c.mutation.Offboarded(); !ok {
+		v := entity.DefaultOffboarded
+		_c.mutation.SetOffboarded(v)
+	}
 	if _, ok := _c.mutation.AssetID(); !ok {
 		v := entity.DefaultAssetID
 		_c.mutation.SetAssetID(v)
@@ -605,6 +639,9 @@ func (_c *EntityCreate) check() error {
 	}
 	if _, ok := _c.mutation.Archived(); !ok {
 		return &ValidationError{Name: "archived", err: errors.New(`ent: missing required field "Entity.archived"`)}
+	}
+	if _, ok := _c.mutation.Offboarded(); !ok {
+		return &ValidationError{Name: "offboarded", err: errors.New(`ent: missing required field "Entity.offboarded"`)}
 	}
 	if _, ok := _c.mutation.AssetID(); !ok {
 		return &ValidationError{Name: "asset_id", err: errors.New(`ent: missing required field "Entity.asset_id"`)}
@@ -722,6 +759,10 @@ func (_c *EntityCreate) createSpec() (*Entity, *sqlgraph.CreateSpec) {
 	if value, ok := _c.mutation.Archived(); ok {
 		_spec.SetField(entity.FieldArchived, field.TypeBool, value)
 		_node.Archived = value
+	}
+	if value, ok := _c.mutation.Offboarded(); ok {
+		_spec.SetField(entity.FieldOffboarded, field.TypeBool, value)
+		_node.Offboarded = value
 	}
 	if value, ok := _c.mutation.AssetID(); ok {
 		_spec.SetField(entity.FieldAssetID, field.TypeInt64, value)
@@ -875,6 +916,22 @@ func (_c *EntityCreate) createSpec() (*Entity, *sqlgraph.CreateSpec) {
 			Bidi:    false,
 			Target: &sqlgraph.EdgeTarget{
 				IDSpec: sqlgraph.NewFieldSpec(entityfield.FieldID, field.TypeUUID),
+			},
+		}
+		for _, k := range nodes {
+			edge.Target.Nodes = append(edge.Target.Nodes, k)
+		}
+		_spec.Edges = append(_spec.Edges, edge)
+	}
+	if nodes := _c.mutation.OffboardingRecordsIDs(); len(nodes) > 0 {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.O2M,
+			Inverse: false,
+			Table:   entity.OffboardingRecordsTable,
+			Columns: []string{entity.OffboardingRecordsColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(entityoffboarding.FieldID, field.TypeUUID),
 			},
 		}
 		for _, k := range nodes {

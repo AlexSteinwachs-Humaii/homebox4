@@ -11,14 +11,18 @@ export function useItemSearch(client: UserClient, opts?: SearchOptions) {
   const tags = ref<TagSummary[]>([]);
   const results = ref<EntitySummary[]>([]);
   const includeArchived = ref(false);
+  const lifecycle = ref<"active" | "all" | "offboarded">("active");
+  watch([lifecycle, includeArchived], () => {
+    void triggerSearch();
+  });
   const isLoading = ref(false);
-  const pendingQuery = ref<string | null>(null);
+  const pendingSearch = ref(false);
 
   watchDebounced(query, search, { debounce: 250, maxWait: 1000 });
   async function search(): Promise<boolean> {
     if (isLoading.value) {
-      // Store the latest query to run after current search completes
-      pendingQuery.value = query.value;
+      // Retry with the latest query AND filters after the current request.
+      pendingSearch.value = true;
       return false;
     }
 
@@ -33,6 +37,7 @@ export function useItemSearch(client: UserClient, opts?: SearchOptions) {
         parentIds: locIds,
         tags: tagIds,
         includeArchived: includeArchived.value,
+        lifecycle: lifecycle.value,
       });
 
       if (error || !data) {
@@ -45,17 +50,10 @@ export function useItemSearch(client: UserClient, opts?: SearchOptions) {
     } finally {
       isLoading.value = false;
 
-      // If user changed query while we were searching, run again with the latest query
-      if (pendingQuery.value !== null && pendingQuery.value !== searchQuery) {
-        const nextQuery = pendingQuery.value;
-        pendingQuery.value = null;
-        // Use nextTick to avoid potential recursion issues
+      if (pendingSearch.value) {
+        pendingSearch.value = false;
         await nextTick();
-        if (query.value === nextQuery) {
-          await search();
-        }
-      } else {
-        pendingQuery.value = null;
+        await search();
       }
     }
   }
@@ -86,6 +84,8 @@ export function useItemSearch(client: UserClient, opts?: SearchOptions) {
     results,
     locations,
     tags,
+    includeArchived,
+    lifecycle,
     isLoading,
     triggerSearch,
   };

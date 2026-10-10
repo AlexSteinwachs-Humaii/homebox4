@@ -217,6 +217,7 @@ func (r *UserRepository) createUserWithMembership(
 		SetName(usr.Name).
 		SetEmail(normalizeEmail(usr.Email)).
 		SetIsSuperuser(usr.IsSuperuser).
+		SetSettings(migrateThemeSettings(nil)).
 		SetDefaultGroupID(usr.DefaultGroupID)
 
 	if usr.Password != nil {
@@ -380,7 +381,24 @@ func (r *UserRepository) SetSettings(ctx context.Context, uid uuid.UUID, setting
 		))
 	defer span.End()
 
-	err := r.db.User.UpdateOneID(uid).SetSettings(settings).Exec(ctx)
+	// Merge rather than discard unknown/unrelated settings. An old browser that
+	// does not carry the rollout marker may not restore its pre-rollout theme.
+	usr, err := r.db.User.Get(ctx, uid)
+	if err != nil {
+		return err
+	}
+	merged := migrateThemeSettings(usr.Settings)
+	for key, value := range settings {
+		if key != "theme" && key != "themeMigrationVersion" {
+			merged[key] = value
+		}
+	}
+	if currentThemeMigration(settings["themeMigrationVersion"]) {
+		if theme, ok := settings["theme"].(string); ok && theme != "" {
+			merged["theme"] = theme
+		}
+	}
+	err = r.db.User.UpdateOneID(uid).SetSettings(merged).Exec(ctx)
 	recordSpanError(span, err)
 	return err
 }
@@ -396,7 +414,7 @@ func (r *UserRepository) GetSettings(ctx context.Context, uid uuid.UUID) (map[st
 		return nil, err
 	}
 	span.SetAttributes(attribute.Int("settings.keys.count", len(usr.Settings)))
-	return usr.Settings, nil
+	return migrateThemeSettings(usr.Settings), nil
 }
 
 func (r *UserRepository) SetOIDCIdentity(ctx context.Context, uid uuid.UUID, issuer, subject string) error {

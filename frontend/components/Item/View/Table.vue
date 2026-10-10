@@ -7,6 +7,7 @@
 
   defineProps<{
     items: EntitySummary[];
+    requiredVisibleColumns?: string[];
   }>();
 
   const { t } = useI18n();
@@ -15,5 +16,11 @@
 </script>
 
 <template>
-  <DataTable view="table" :data="items" :columns="columns" disable-controls />
+  <DataTable
+    view="table"
+    :data="items"
+    :columns="columns"
+    :required-visible-columns="requiredVisibleColumns"
+    disable-controls
+  />
 </template>

@@ -229,6 +229,9 @@ definitions:
       notes:
         description: Notes holds the value of the "notes" field.
         type: string
+      offboarded:
+        description: Offboarded holds the value of the "offboarded" field.
+        type: boolean
       purchase_date:
         description: PurchaseDate holds the value of the "purchase_date" field.
         type: string
@@ -301,6 +304,12 @@ definitions:
         items:
           $ref: '#/definitions/ent.MaintenanceEntry'
         type: array
+      offboarding_records:
+        description: OffboardingRecords holds the value of the offboarding_records
+          edge.
+        items:
+          $ref: '#/definitions/ent.EntityOffboarding'
+        type: array
       parent:
         allOf:
         - $ref: '#/definitions/ent.Entity'
@@ -352,6 +361,50 @@ definitions:
         type: string
     type: object
   ent.EntityFieldEdges:
+    properties:
+      entity:
+        allOf:
+        - $ref: '#/definitions/ent.Entity'
+        description: Entity holds the value of the entity edge.
+    type: object
+  ent.EntityOffboarding:
+    properties:
+      created_at:
+        description: CreatedAt holds the value of the "created_at" field.
+        type: string
+      custom_reason:
+        description: CustomReason holds the value of the "custom_reason" field.
+        type: string
+      edges:
+        allOf:
+        - $ref: '#/definitions/ent.EntityOffboardingEdges'
+        description: |-
+          Edges holds the relations/edges for other nodes in the graph.
+          The values are being populated by the EntityOffboardingQuery when eager-loading is set.
+      effective_date:
+        description: EffectiveDate holds the value of the "effective_date" field.
+        type: string
+      entity_id:
+        description: EntityID holds the value of the "entity_id" field.
+        type: string
+      id:
+        description: ID of the ent.
+        type: string
+      notes:
+        description: Notes holds the value of the "notes" field.
+        type: string
+      outcome:
+        allOf:
+        - $ref: '#/definitions/entityoffboarding.Outcome'
+        description: Outcome holds the value of the "outcome" field.
+      reactivated_at:
+        description: ReactivatedAt holds the value of the "reactivated_at" field.
+        type: string
+      updated_at:
+        description: UpdatedAt holds the value of the "updated_at" field.
+        type: string
+    type: object
+  ent.EntityOffboardingEdges:
     properties:
       entity:
         allOf:
@@ -989,6 +1042,22 @@ definitions:
     - TypeNumber
     - TypeBoolean
     - TypeTime
+  entityoffboarding.Outcome:
+    enum:
+    - sold
+    - donated
+    - disposed
+    - recycled
+    - lost
+    - custom
+    type: string
+    x-enum-varnames:
+    - OutcomeSold
+    - OutcomeDonated
+    - OutcomeDisposed
+    - OutcomeRecycled
+    - OutcomeLost
+    - OutcomeCustom
   export.Kind:
     enum:
     - export
@@ -1160,6 +1229,24 @@ definitions:
       totalPrice:
         type: number
     type: object
+  repo.EntityOffboardingRecord:
+    properties:
+      createdAt:
+        type: string
+      customReason:
+        type: string
+      effectiveDate:
+        type: string
+      id:
+        type: string
+      notes:
+        type: string
+      outcome:
+        type: string
+      reactivatedAt:
+        type: string
+        x-nullable: true
+    type: object
   repo.EntityOut:
     properties:
       archived:
@@ -1223,6 +1310,12 @@ definitions:
       notes:
         description: Extras
         type: string
+      offboarded:
+        type: boolean
+      offboardingHistory:
+        items:
+          $ref: '#/definitions/repo.EntityOffboardingRecord'
+        type: array
       parent:
         allOf:
         - $ref: '#/definitions/repo.EntitySummary'
@@ -1337,6 +1430,8 @@ definitions:
         type: number
       name:
         type: string
+      offboarded:
+        type: boolean
       parent:
         allOf:
         - $ref: '#/definitions/repo.EntitySummary'
@@ -2217,6 +2312,25 @@ definitions:
     required:
     - name
     type: object
+  v1.EntityOffboardRequest:
+    properties:
+      customReason:
+        type: string
+      effectiveDate:
+        example: "2026-10-09"
+        type: string
+      notes:
+        type: string
+      outcome:
+        enum:
+        - sold
+        - donated
+        - disposed
+        - recycled
+        - lost
+        - custom
+        type: string
+    type: object
   v1.EntityTemplateCreateItemRequest:
     properties:
       description:
@@ -2505,6 +2619,15 @@ paths:
   /v1/entities:
     get:
       parameters:
+      - default: active
+        description: Lifecycle filter; archive filtering remains independent
+        enum:
+        - active
+        - all
+        - offboarded
+        in: query
+        name: lifecycle
+        type: string
       - description: search string
         in: query
         name: q
@@ -2885,6 +3008,80 @@ paths:
       summary: Create Maintenance Entry
       tags:
       - Item Maintenance
+  /v1/entities/{id}/offboard:
+    post:
+      consumes:
+      - application/json
+      parameters:
+      - description: Entity ID
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: Offboarding record
+        in: body
+        name: payload
+        required: true
+        schema:
+          $ref: '#/definitions/v1.EntityOffboardRequest'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            $ref: '#/definitions/repo.EntityOffboardingRecord'
+        "400":
+          description: Bad Request
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "404":
+          description: Not Found
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "409":
+          description: Conflict
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      security:
+      - Bearer: []
+      summary: Offboard an active asset
+      tags:
+      - Entities
+  /v1/entities/{id}/offboarding-history:
+    get:
+      parameters:
+      - description: Entity ID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            items:
+              $ref: '#/definitions/repo.EntityOffboardingRecord'
+            type: array
+        "404":
+          description: Not Found
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      security:
+      - Bearer: []
+      summary: Get retained asset offboarding history, oldest recorded first
+      tags:
+      - Entities
   /v1/entities/{id}/path:
     get:
       parameters:
@@ -2905,6 +3102,40 @@ paths:
       security:
       - Bearer: []
       summary: Get the full path of an entity
+      tags:
+      - Entities
+  /v1/entities/{id}/reactivate:
+    post:
+      parameters:
+      - description: Entity ID
+        in: path
+        name: id
+        required: true
+        type: string
+      responses:
+        "204":
+          description: No Content
+        "400":
+          description: Bad Request
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "404":
+          description: Not Found
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "409":
+          description: Conflict
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      security:
+      - Bearer: []
+      summary: Reactivate an offboarded asset without changing archive state
       tags:
       - Entities
   /v1/entities/export:

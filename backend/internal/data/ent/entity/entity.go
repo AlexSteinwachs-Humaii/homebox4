@@ -33,6 +33,8 @@ const (
 	FieldInsured = "insured"
 	// FieldArchived holds the string denoting the archived field in the database.
 	FieldArchived = "archived"
+	// FieldOffboarded holds the string denoting the offboarded field in the database.
+	FieldOffboarded = "offboarded"
 	// FieldAssetID holds the string denoting the asset_id field in the database.
 	FieldAssetID = "asset_id"
 	// FieldSyncChildEntityLocations holds the string denoting the sync_child_entity_locations field in the database.
@@ -75,6 +77,8 @@ const (
 	EdgeEntityType = "entity_type"
 	// EdgeFields holds the string denoting the fields edge name in mutations.
 	EdgeFields = "fields"
+	// EdgeOffboardingRecords holds the string denoting the offboarding_records edge name in mutations.
+	EdgeOffboardingRecords = "offboarding_records"
 	// EdgeMaintenanceEntries holds the string denoting the maintenance_entries edge name in mutations.
 	EdgeMaintenanceEntries = "maintenance_entries"
 	// EdgeAttachments holds the string denoting the attachments edge name in mutations.
@@ -115,6 +119,13 @@ const (
 	FieldsInverseTable = "entity_fields"
 	// FieldsColumn is the table column denoting the fields relation/edge.
 	FieldsColumn = "entity_fields"
+	// OffboardingRecordsTable is the table that holds the offboarding_records relation/edge.
+	OffboardingRecordsTable = "entity_offboardings"
+	// OffboardingRecordsInverseTable is the table name for the EntityOffboarding entity.
+	// It exists in this package in order to avoid circular dependency with the "entityoffboarding" package.
+	OffboardingRecordsInverseTable = "entity_offboardings"
+	// OffboardingRecordsColumn is the table column denoting the offboarding_records relation/edge.
+	OffboardingRecordsColumn = "entity_id"
 	// MaintenanceEntriesTable is the table that holds the maintenance_entries relation/edge.
 	MaintenanceEntriesTable = "maintenance_entries"
 	// MaintenanceEntriesInverseTable is the table name for the MaintenanceEntry entity.
@@ -143,6 +154,7 @@ var Columns = []string{
 	FieldQuantity,
 	FieldInsured,
 	FieldArchived,
+	FieldOffboarded,
 	FieldAssetID,
 	FieldSyncChildEntityLocations,
 	FieldSerialNumber,
@@ -210,6 +222,8 @@ var (
 	DefaultInsured bool
 	// DefaultArchived holds the default value on creation for the "archived" field.
 	DefaultArchived bool
+	// DefaultOffboarded holds the default value on creation for the "offboarded" field.
+	DefaultOffboarded bool
 	// DefaultAssetID holds the default value on creation for the "asset_id" field.
 	DefaultAssetID int64
 	// DefaultSyncChildEntityLocations holds the default value on creation for the "sync_child_entity_locations" field.
@@ -285,6 +299,11 @@ func ByInsured(opts ...sql.OrderTermOption) OrderOption {
 // ByArchived orders the results by the archived field.
 func ByArchived(opts ...sql.OrderTermOption) OrderOption {
 	return sql.OrderByField(FieldArchived, opts...).ToFunc()
+}
+
+// ByOffboarded orders the results by the offboarded field.
+func ByOffboarded(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldOffboarded, opts...).ToFunc()
 }
 
 // ByAssetID orders the results by the asset_id field.
@@ -425,6 +444,20 @@ func ByFields(term sql.OrderTerm, terms ...sql.OrderTerm) OrderOption {
 	}
 }
 
+// ByOffboardingRecordsCount orders the results by offboarding_records count.
+func ByOffboardingRecordsCount(opts ...sql.OrderTermOption) OrderOption {
+	return func(s *sql.Selector) {
+		sqlgraph.OrderByNeighborsCount(s, newOffboardingRecordsStep(), opts...)
+	}
+}
+
+// ByOffboardingRecords orders the results by offboarding_records terms.
+func ByOffboardingRecords(term sql.OrderTerm, terms ...sql.OrderTerm) OrderOption {
+	return func(s *sql.Selector) {
+		sqlgraph.OrderByNeighborTerms(s, newOffboardingRecordsStep(), append([]sql.OrderTerm{term}, terms...)...)
+	}
+}
+
 // ByMaintenanceEntriesCount orders the results by maintenance_entries count.
 func ByMaintenanceEntriesCount(opts ...sql.OrderTermOption) OrderOption {
 	return func(s *sql.Selector) {
@@ -492,6 +525,13 @@ func newFieldsStep() *sqlgraph.Step {
 		sqlgraph.From(Table, FieldID),
 		sqlgraph.To(FieldsInverseTable, FieldID),
 		sqlgraph.Edge(sqlgraph.O2M, false, FieldsTable, FieldsColumn),
+	)
+}
+func newOffboardingRecordsStep() *sqlgraph.Step {
+	return sqlgraph.NewStep(
+		sqlgraph.From(Table, FieldID),
+		sqlgraph.To(OffboardingRecordsInverseTable, FieldID),
+		sqlgraph.Edge(sqlgraph.O2M, false, OffboardingRecordsTable, OffboardingRecordsColumn),
 	)
 }
 func newMaintenanceEntriesStep() *sqlgraph.Step {

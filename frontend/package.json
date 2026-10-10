@@ -12,7 +12,8 @@
     "typecheck": "pnpm nuxi typecheck --noEmit",
     "test:ci": "TEST_SHUTDOWN_API_SERVER=true vitest --run --config ./test/vitest.config.ts --no-file-parallelism",
     "test:local": "TEST_SHUTDOWN_API_SERVER=false && vitest --run --config ./test/vitest.config.ts",
-    "test:watch": " TEST_SHUTDOWN_API_SERVER=false vitest --config ./test/vitest.config.ts"
+    "test:watch": " TEST_SHUTDOWN_API_SERVER=false vitest --config ./test/vitest.config.ts",
+    "test:theme": "vitest --run --config ./test/vitest.theme.config.ts"
   },
   "devDependencies": {
     "@eslint/compat": "^1.4.1",
@@ -24,7 +25,9 @@
     "@types/markdown-it": "^14.1.2",
     "@types/semver": "^7.8.0",
     "@vite-pwa/nuxt": "^1.1.1",
+    "@vitejs/plugin-vue": "^6.0.9",
     "@vue/runtime-core": "^3.5.40",
+    "@vue/test-utils": "^2.5.1",
     "eslint": "^9.39.5",
     "eslint-config-prettier": "^10.1.8",
     "eslint-plugin-prettier": "^5.5.6",
@@ -33,6 +36,7 @@
     "h3": "^1.15.6",
     "intl-messageformat": "^10.7.18",
     "isomorphic-fetch": "^3.0.0",
+    "jsdom": "^26.1.0",
     "nuxt": "4.4.7",
     "prettier": "^3.9.6",
     "shadcn-nuxt": "2.2.0",

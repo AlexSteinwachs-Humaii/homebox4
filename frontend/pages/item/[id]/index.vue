@@ -46,6 +46,10 @@
   import ItemAttachmentsList from "~/components/Item/AttachmentsList.vue";
   import ItemViewSelectable from "~/components/Item/View/Selectable.vue";
 
+  import OffboardingDialog from "~/components/Item/OffboardingDialog.vue";
+  import OffboardingHistory from "~/components/Item/OffboardingHistory.vue";
+
+  const lifecycleOpen = ref(false);
   const { t } = useI18n();
 
   const { openDialog, closeDialog } = useDialog();
@@ -80,6 +84,22 @@
     }
     return data;
   });
+  const lifecycleDetails = computed(() =>
+    item.value
+      ? {
+          id: item.value.id,
+          offboarded: item.value.offboarded,
+          records: item.value.offboardingHistory ?? [],
+          isLocation: item.value.entityType?.isLocation ?? false,
+        }
+      : null
+  );
+
+  async function lifecycleSaved() {
+    await refreshNuxtData();
+    await refresh();
+  }
+
   onMounted(() => {
     refresh();
   });
@@ -613,7 +633,11 @@
       return;
     }
 
-    toast.success(t("components.template.toast.saved_as_template", { name: templateData.name }));
+    toast.success(
+      t("components.template.toast.saved_as_template", {
+        name: templateData.name,
+      })
+    );
     navigateTo(`/template/${data.id}`);
   }
 
@@ -719,6 +743,12 @@
                   </Button>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="end" class="w-48">
+                  <DropdownMenuItem
+                    v-if="lifecycleDetails && !lifecycleDetails.isLocation"
+                    @click="lifecycleOpen = true"
+                  >
+                    {{ $t(lifecycleDetails.offboarded ? "items.lifecycle.reactivate" : "items.lifecycle.offboard") }}
+                  </DropdownMenuItem>
                   <DropdownMenuItem @click="handleDuplicateClick">
                     <MdiPlusBoxMultipleOutline class="mr-2 size-4" />
                     {{ $t("global.duplicate") }}
@@ -742,6 +772,20 @@
           <Markdown class="text-base" :source="item.description" />
         </div>
       </Card>
+
+      <OffboardingDialog
+        v-if="lifecycleDetails"
+        v-model:open="lifecycleOpen"
+        :item-id="lifecycleDetails.id"
+        :offboarded="lifecycleDetails.offboarded"
+        @saved="lifecycleSaved"
+      />
+      <OffboardingHistory
+        v-if="lifecycleDetails && (lifecycleDetails.offboarded || lifecycleDetails.records.length)"
+        class="mt-3"
+        :records="lifecycleDetails.records"
+        :offboarded="lifecycleDetails.offboarded"
+      />
 
       <div class="mb-6 mt-3 flex flex-wrap items-center justify-between">
         <ButtonGroup>
@@ -842,7 +886,9 @@
               </template>
             </DetailsSection>
             <div v-else>
-              <p class="px-6 pb-4 text-foreground/70">{{ $t("items.no_attachments") }}</p>
+              <p class="px-6 pb-4 text-foreground/70">
+                {{ $t("items.no_attachments") }}
+              </p>
             </div>
           </BaseCard>
 

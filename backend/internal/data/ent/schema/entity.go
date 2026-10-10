@@ -29,6 +29,7 @@ func (Entity) Indexes() []ent.Index {
 		index.Fields("model_number"),
 		index.Fields("serial_number"),
 		index.Fields("archived"),
+		index.Fields("offboarded"),
 		index.Fields("asset_id"),
 	}
 }
@@ -47,6 +48,8 @@ func (Entity) Fields() []ent.Field {
 		field.Bool("insured").
 			Default(false),
 		field.Bool("archived").
+			Default(false),
+		field.Bool("offboarded").
 			Default(false),
 		field.Int64("asset_id").
 			Default(0),
@@ -118,6 +121,7 @@ func (Entity) Edges() []ent.Edge {
 			Unique().
 			Required(),
 		owned("fields", EntityField.Type),
+		owned("offboarding_records", EntityOffboarding.Type),
 		owned("maintenance_entries", MaintenanceEntry.Type),
 		owned("attachments", Attachment.Type),
 	}

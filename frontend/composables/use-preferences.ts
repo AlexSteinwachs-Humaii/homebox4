@@ -1,4 +1,9 @@
 import type { Ref } from "vue";
+import {
+  normalizeThemePreferences,
+  PREFERENCE_STORAGE_KEY,
+  THEME_MIGRATION_VERSION,
+} from "~/lib/data/theme-preferences";
 import type { EntitySummary } from "~/lib/api/types/data-contracts";
 import type { DaisyTheme } from "~~/lib/data/themes";
 
@@ -17,6 +22,7 @@ export type LocationViewPreferences = {
   editorAdvancedView: boolean;
   itemDisplayView: ViewType;
   theme: DaisyTheme;
+  themeMigrationVersion: number;
   itemsPerTablePage: number;
   tableHeaders?: {
     value: keyof EntitySummary;
@@ -34,7 +40,7 @@ export type LocationViewPreferences = {
   };
 };
 export type PreferenceSyncConfig = Partial<Record<keyof LocationViewPreferences, boolean>>;
-type PreferenceChange = true | Record<string, PreferenceChange>;
+type PreferenceChange = true | { [key: string]: PreferenceChange };
 type PreferenceChanges = Partial<Record<keyof LocationViewPreferences, PreferenceChange>>;
 
 const DEFAULT_PREFERENCES: LocationViewPreferences = {
@@ -42,7 +48,8 @@ const DEFAULT_PREFERENCES: LocationViewPreferences = {
   showEmpty: true,
   editorAdvancedView: false,
   itemDisplayView: "card",
-  theme: "homebox",
+  theme: "claude",
+  themeMigrationVersion: THEME_MIGRATION_VERSION,
   itemsPerTablePage: 12,
   displayLegacyHeader: false,
   legacyImageFit: false,
@@ -68,7 +75,27 @@ let syncInitialized = false;
 
 const preferenceKeys = Object.keys(DEFAULT_PREFERENCES) as (keyof LocationViewPreferences)[];
 
-const results = useLocalStorage("homebox/preferences/location", DEFAULT_PREFERENCES, { mergeDefaults: true });
+const results = useLocalStorage(PREFERENCE_STORAGE_KEY, DEFAULT_PREFERENCES, {
+  mergeDefaults: true,
+  serializer: {
+    read: raw => {
+      try {
+        return {
+          ...DEFAULT_PREFERENCES,
+          ...normalizeThemePreferences(JSON.parse(raw)),
+        } as LocationViewPreferences;
+      } catch {
+        return { ...DEFAULT_PREFERENCES };
+      }
+    },
+    write: value => JSON.stringify(value),
+  },
+});
+// Also cover missing storage and persist the marker even without an authenticated session.
+results.value = {
+  ...results.value,
+  ...normalizeThemePreferences(results.value),
+} as LocationViewPreferences;
 
 function forEachSyncedPreference(callback: (key: keyof LocationViewPreferences) => void) {
   for (const key of preferenceKeys) {
@@ -213,7 +240,7 @@ async function fetchViewPreferencesFromServer(): Promise<Record<string, unknown>
   return data.item;
 }
 export function useViewPreferencesSync() {
-  if (syncInitialized || !import.meta.client) {
+  if (syncInitialized || typeof window === "undefined") {
     return;
   }
 
@@ -305,7 +332,11 @@ export function useViewPreferencesSync() {
             const localChanges =
               localRevision === refreshRevision ? {} : getChangedPreferences(refreshSettings, preferences.value);
             applyingServerSnapshot = true;
-            preferences.value = mergeSyncedSettings(settings, preferences.value, localChanges);
+            preferences.value = mergeSyncedSettings(
+              normalizeThemePreferences(settings),
+              preferences.value,
+              localChanges
+            );
           }
         } finally {
           applyingServerSnapshot = false;

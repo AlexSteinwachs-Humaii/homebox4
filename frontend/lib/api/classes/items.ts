@@ -1,6 +1,8 @@
 import { BaseAPI, route } from "../base";
 import type {
   EntityCreate,
+  EntityOffboardRequest,
+  EntityOffboardingRecord,
   EntityListResult,
   EntityOut,
   EntityPatch,
@@ -20,6 +22,7 @@ import type { Requests } from "~~/lib/requests";
 export type ItemsQuery = {
   orderBy?: string;
   includeArchived?: boolean;
+  lifecycle?: "active" | "all" | "offboarded";
   page?: number;
   pageSize?: number;
   parentIds?: string[];
@@ -132,6 +135,25 @@ export class ItemsApi extends BaseAPI {
 
   async get(id: string) {
     return this.http.get<EntityOut>({ url: route(`/entities/${id}`) });
+  }
+
+  offboardingHistory(id: string) {
+    return this.http.get<EntityOffboardingRecord[]>({
+      url: route(`/entities/${id}/offboarding-history`),
+    });
+  }
+
+  offboard(id: string, data: EntityOffboardRequest) {
+    return this.http.post<EntityOffboardRequest, EntityOffboardingRecord>({
+      url: route(`/entities/${id}/offboard`),
+      body: data,
+    });
+  }
+
+  reactivate(id: string) {
+    return this.http.post<undefined, void>({
+      url: route(`/entities/${id}/reactivate`),
+    });
   }
 
   delete(id: string) {

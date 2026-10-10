@@ -11,6 +11,7 @@ import (
 	"github.com/sysadminsmedia/homebox/backend/internal/data/ent/authtokens"
 	"github.com/sysadminsmedia/homebox/backend/internal/data/ent/entity"
 	"github.com/sysadminsmedia/homebox/backend/internal/data/ent/entityfield"
+	"github.com/sysadminsmedia/homebox/backend/internal/data/ent/entityoffboarding"
 	"github.com/sysadminsmedia/homebox/backend/internal/data/ent/entitytemplate"
 	"github.com/sysadminsmedia/homebox/backend/internal/data/ent/entitytype"
 	"github.com/sysadminsmedia/homebox/backend/internal/data/ent/export"
@@ -185,44 +186,48 @@ func init() {
 	entityDescArchived := entityFields[4].Descriptor()
 	// entity.DefaultArchived holds the default value on creation for the archived field.
 	entity.DefaultArchived = entityDescArchived.Default.(bool)
+	// entityDescOffboarded is the schema descriptor for offboarded field.
+	entityDescOffboarded := entityFields[5].Descriptor()
+	// entity.DefaultOffboarded holds the default value on creation for the offboarded field.
+	entity.DefaultOffboarded = entityDescOffboarded.Default.(bool)
 	// entityDescAssetID is the schema descriptor for asset_id field.
-	entityDescAssetID := entityFields[5].Descriptor()
+	entityDescAssetID := entityFields[6].Descriptor()
 	// entity.DefaultAssetID holds the default value on creation for the asset_id field.
 	entity.DefaultAssetID = entityDescAssetID.Default.(int64)
 	// entityDescSyncChildEntityLocations is the schema descriptor for sync_child_entity_locations field.
-	entityDescSyncChildEntityLocations := entityFields[6].Descriptor()
+	entityDescSyncChildEntityLocations := entityFields[7].Descriptor()
 	// entity.DefaultSyncChildEntityLocations holds the default value on creation for the sync_child_entity_locations field.
 	entity.DefaultSyncChildEntityLocations = entityDescSyncChildEntityLocations.Default.(bool)
 	// entityDescSerialNumber is the schema descriptor for serial_number field.
-	entityDescSerialNumber := entityFields[7].Descriptor()
+	entityDescSerialNumber := entityFields[8].Descriptor()
 	// entity.SerialNumberValidator is a validator for the "serial_number" field. It is called by the builders before save.
 	entity.SerialNumberValidator = entityDescSerialNumber.Validators[0].(func(string) error)
 	// entityDescModelNumber is the schema descriptor for model_number field.
-	entityDescModelNumber := entityFields[8].Descriptor()
+	entityDescModelNumber := entityFields[9].Descriptor()
 	// entity.ModelNumberValidator is a validator for the "model_number" field. It is called by the builders before save.
 	entity.ModelNumberValidator = entityDescModelNumber.Validators[0].(func(string) error)
 	// entityDescManufacturer is the schema descriptor for manufacturer field.
-	entityDescManufacturer := entityFields[9].Descriptor()
+	entityDescManufacturer := entityFields[10].Descriptor()
 	// entity.ManufacturerValidator is a validator for the "manufacturer" field. It is called by the builders before save.
 	entity.ManufacturerValidator = entityDescManufacturer.Validators[0].(func(string) error)
 	// entityDescLifetimeWarranty is the schema descriptor for lifetime_warranty field.
-	entityDescLifetimeWarranty := entityFields[10].Descriptor()
+	entityDescLifetimeWarranty := entityFields[11].Descriptor()
 	// entity.DefaultLifetimeWarranty holds the default value on creation for the lifetime_warranty field.
 	entity.DefaultLifetimeWarranty = entityDescLifetimeWarranty.Default.(bool)
 	// entityDescWarrantyDetails is the schema descriptor for warranty_details field.
-	entityDescWarrantyDetails := entityFields[12].Descriptor()
+	entityDescWarrantyDetails := entityFields[13].Descriptor()
 	// entity.WarrantyDetailsValidator is a validator for the "warranty_details" field. It is called by the builders before save.
 	entity.WarrantyDetailsValidator = entityDescWarrantyDetails.Validators[0].(func(string) error)
 	// entityDescPurchasePrice is the schema descriptor for purchase_price field.
-	entityDescPurchasePrice := entityFields[15].Descriptor()
+	entityDescPurchasePrice := entityFields[16].Descriptor()
 	// entity.DefaultPurchasePrice holds the default value on creation for the purchase_price field.
 	entity.DefaultPurchasePrice = entityDescPurchasePrice.Default.(float64)
 	// entityDescSoldPrice is the schema descriptor for sold_price field.
-	entityDescSoldPrice := entityFields[18].Descriptor()
+	entityDescSoldPrice := entityFields[19].Descriptor()
 	// entity.DefaultSoldPrice holds the default value on creation for the sold_price field.
 	entity.DefaultSoldPrice = entityDescSoldPrice.Default.(float64)
 	// entityDescSoldNotes is the schema descriptor for sold_notes field.
-	entityDescSoldNotes := entityFields[19].Descriptor()
+	entityDescSoldNotes := entityFields[20].Descriptor()
 	// entity.SoldNotesValidator is a validator for the "sold_notes" field. It is called by the builders before save.
 	entity.SoldNotesValidator = entityDescSoldNotes.Validators[0].(func(string) error)
 	// entityDescID is the schema descriptor for id field.
@@ -284,6 +289,33 @@ func init() {
 	entityfieldDescID := entityfieldMixinFields0[0].Descriptor()
 	// entityfield.DefaultID holds the default value on creation for the id field.
 	entityfield.DefaultID = entityfieldDescID.Default.(func() uuid.UUID)
+	entityoffboardingMixin := schema.EntityOffboarding{}.Mixin()
+	entityoffboardingMixinFields0 := entityoffboardingMixin[0].Fields()
+	_ = entityoffboardingMixinFields0
+	entityoffboardingFields := schema.EntityOffboarding{}.Fields()
+	_ = entityoffboardingFields
+	// entityoffboardingDescCreatedAt is the schema descriptor for created_at field.
+	entityoffboardingDescCreatedAt := entityoffboardingMixinFields0[1].Descriptor()
+	// entityoffboarding.DefaultCreatedAt holds the default value on creation for the created_at field.
+	entityoffboarding.DefaultCreatedAt = entityoffboardingDescCreatedAt.Default.(func() time.Time)
+	// entityoffboardingDescUpdatedAt is the schema descriptor for updated_at field.
+	entityoffboardingDescUpdatedAt := entityoffboardingMixinFields0[2].Descriptor()
+	// entityoffboarding.DefaultUpdatedAt holds the default value on creation for the updated_at field.
+	entityoffboarding.DefaultUpdatedAt = entityoffboardingDescUpdatedAt.Default.(func() time.Time)
+	// entityoffboarding.UpdateDefaultUpdatedAt holds the default value on update for the updated_at field.
+	entityoffboarding.UpdateDefaultUpdatedAt = entityoffboardingDescUpdatedAt.UpdateDefault.(func() time.Time)
+	// entityoffboardingDescCustomReason is the schema descriptor for custom_reason field.
+	entityoffboardingDescCustomReason := entityoffboardingFields[2].Descriptor()
+	// entityoffboarding.CustomReasonValidator is a validator for the "custom_reason" field. It is called by the builders before save.
+	entityoffboarding.CustomReasonValidator = entityoffboardingDescCustomReason.Validators[0].(func(string) error)
+	// entityoffboardingDescNotes is the schema descriptor for notes field.
+	entityoffboardingDescNotes := entityoffboardingFields[4].Descriptor()
+	// entityoffboarding.NotesValidator is a validator for the "notes" field. It is called by the builders before save.
+	entityoffboarding.NotesValidator = entityoffboardingDescNotes.Validators[0].(func(string) error)
+	// entityoffboardingDescID is the schema descriptor for id field.
+	entityoffboardingDescID := entityoffboardingMixinFields0[0].Descriptor()
+	// entityoffboarding.DefaultID holds the default value on creation for the id field.
+	entityoffboarding.DefaultID = entityoffboardingDescID.Default.(func() uuid.UUID)
 	entitytemplateMixin := schema.EntityTemplate{}.Mixin()
 	entitytemplateMixinFields0 := entitytemplateMixin[0].Fields()
 	_ = entitytemplateMixinFields0

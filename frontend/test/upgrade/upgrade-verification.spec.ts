@@ -21,6 +21,7 @@ interface TestUser {
 }
 
 interface TestData {
+  legacySettings?: Record<string, unknown>;
   users?: TestUser[];
   locations?: Record<string, string[]>;
   tags?: Record<string, string[]>;
@@ -42,6 +43,43 @@ test.beforeAll(() => {
 });
 
 test.describe("HomeBox Upgrade Verification", () => {
+  test("Claude replaces pre-upgrade theme but preserves unrelated server and local preferences", async ({ page }) => {
+    const user = testData.users?.[0];
+    if (!user || !testData.legacySettings)
+      throw new Error("Missing pre-upgrade theme seed; rerun create-test-data.sh on the old release");
+    const key = "homebox/preferences/location";
+    await page.goto("/");
+    await page.evaluate(({ key, settings }) => localStorage.setItem(key, JSON.stringify(settings)), {
+      key,
+      settings: testData.legacySettings,
+    });
+    await page.reload();
+    await expect(page.locator("html")).toHaveAttribute("data-theme", "claude");
+    expect(await page.evaluate(key => JSON.parse(localStorage.getItem(key)!), key)).toMatchObject({
+      theme: "claude",
+      showEmpty: false,
+      itemsPerTablePage: 24,
+      claudeUpgradeSentinel: { retained: true },
+    });
+    await page.locator("input[type=text]").fill(user.email);
+    await page.locator("input[type=password]").fill(user.password);
+    const login = page.waitForResponse("**/api/v1/users/login");
+    await page.getByRole("button", { name: "Login", exact: true }).click();
+    const { token } = await (await login).json();
+    await expect(page).toHaveURL("/home");
+    const response = await page.request.get("/api/v1/users/self/settings", {
+      headers: { Authorization: token },
+    });
+    expect(response.ok()).toBeTruthy();
+    expect((await response.json()).item).toMatchObject({
+      ...testData.legacySettings,
+      theme: "claude",
+      themeMigrationVersion: 1,
+    });
+    await page.reload();
+    await expect(page.locator("html")).toHaveAttribute("data-theme", "claude");
+  });
+
   test("verify all users can log in", async ({ page }) => {
     // Test each user from the test data
     for (const user of testData.users || []) {
