@@ -55,14 +55,16 @@
   const onlyWithoutPhoto = control("onlyWithoutPhoto");
   const onlyWithPhoto = control("onlyWithPhoto");
   const orderBy = control("orderBy");
+  // Corrections follow the route, so they must not reset the page: a reset
+  // would replace Back/Forward with a new page-1 entry.
   watch(onlyWithPhoto, value => {
-    if (value && onlyWithoutPhoto.value) void update({ onlyWithoutPhoto: false });
+    if (value && onlyWithoutPhoto.value) void update({ onlyWithoutPhoto: false }, false);
   });
   watch(onlyWithoutPhoto, value => {
-    if (value && onlyWithPhoto.value) void update({ onlyWithPhoto: false });
+    if (value && onlyWithPhoto.value) void update({ onlyWithPhoto: false }, false);
   });
   watch(fieldSelector, value => {
-    if (!value) void update({ fields: [] });
+    if (!value && state.value.fields.length) void update({ fields: [] }, false);
   });
   watch(pageSize, () => void update({ page: 1 }));
 
@@ -157,7 +159,9 @@
   });
   const loading = results.pending;
   const items = computed<EntitySummary[]>(() => results.data.value?.items || []);
-  const total = computed(() => results.data.value?.total || 0);
+  // Null while a request is in flight: do not advertise 0 results during loading.
+  const hasResults = computed(() => results.data.value != null);
+  const total = computed(() => results.data.value?.total ?? 0);
   const pagination = proxyRefs({
     page,
     pageSize,
@@ -184,14 +188,18 @@
     <ItemContext :title="t('menu.inventory')">
       <template #metadata
         ><p class="text-sm text-muted-foreground">
-          {{ selectedCollection?.name }} · {{ t("items.results", { total }) }}
+          <template v-if="selectedCollection?.name">{{ selectedCollection.name }}</template>
+          <template v-if="hasResults">
+            <template v-if="selectedCollection?.name"> · </template>{{ t("items.results", { total }) }}
+          </template>
         </p></template
       >
       <template #actions
         ><Button @click="addItem"><Plus />{{ t("home.add_item") }}</Button></template
       >
     </ItemContext>
-    <Panel class="overflow-hidden p-0">
+    <Feedback v-if="!collectionId" :title="t('home.choose_collection')" />
+    <Panel v-else class="overflow-hidden p-0">
       <div class="space-y-4 border-b p-5">
         <div class="flex flex-wrap items-end gap-4 md:flex-nowrap">
           <div class="w-full">
