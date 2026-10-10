@@ -862,6 +862,24 @@
         }
     },
     "maintenance": {
+        "schedule": {
+            "description": "Care for the things you want to keep.",
+            "work": "Scheduled work",
+            "status_help": "Scheduled means not completed. Tasks are shown in the stored schedule order, including past due dates.",
+            "select_collection": "Select a collection to see its maintenance schedule.",
+            "loading": "Loading maintenance schedule…",
+            "failed": "Unable to load the maintenance schedule.",
+            "retry": "Try again",
+            "empty": "No scheduled maintenance recorded in this collection.",
+            "due": "Due date",
+            "no_due_date": "No due date recorded",
+            "unnamed": "Unnamed task",
+            "unnamed_item": "Unnamed item",
+            "item_unavailable": "Associated item unavailable",
+            "no_description": "No description recorded",
+            "read_only": "A schedule, not a score.",
+            "read_only_help": "This is a read-only view of recorded tasks. Open the associated item for its details and existing maintenance log."
+        },
         "filter": {
             "both": "Both",
             "completed": "Completed",
