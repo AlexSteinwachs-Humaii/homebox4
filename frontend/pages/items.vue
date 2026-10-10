@@ -172,6 +172,9 @@
     return Number.isNaN(id) ? t("items.invalid_asset_id") : id;
   });
   const search = () => results.refresh();
+  // Single entry point for the later routed capture form. Until it exists,
+  // use the supported creation dialog rather than navigating to an absent route.
+  const addItem = () => openDialog(DialogID.CreateEntity, { params: { baseType: "item" } });
   const submit = () => search();
   const reset = () => update(queryDefaults);
 </script>
@@ -185,9 +188,7 @@
         </p></template
       >
       <template #actions
-        ><Button @click="openDialog(DialogID.CreateEntity, { params: { baseType: 'item' } })"
-          ><Plus />{{ t("home.add_item") }}</Button
-        ></template
+        ><Button @click="addItem"><Plus />{{ t("home.add_item") }}</Button></template
       >
     </ItemContext>
     <Panel class="overflow-hidden p-0">

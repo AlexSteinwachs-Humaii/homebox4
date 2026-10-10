@@ -4,7 +4,7 @@ import InventoryIdentity from "./inventory-identity.vue";
 import DropdownAction from "./data-table-dropdown.vue";
 import { ArrowDown, ArrowUpDown, Check, X } from "lucide-vue-next";
 import Button from "~/components/ui/button/Button.vue";
-import Checkbox from "~/components/Form/Checkbox.vue";
+import Checkbox from "~/components/ui/checkbox/Checkbox.vue";
 import type { EntitySummary } from "~/lib/api/types/data-contracts";
 
 import Currency from "~/components/global/Currency.vue";
@@ -56,16 +56,16 @@ export function makeColumns({
           modelValue: table.getIsAllPageRowsSelected()
             ? true
             : table.getSelectedRowModel().rows.length > 0
-              ? ("indeterminate" as unknown as boolean) // :)
+              ? "indeterminate"
               : false,
-          "onUpdate:modelValue": (value: boolean) => table.toggleAllPageRowsSelected(!!value),
-          ariaLabel: t("components.item.view.selectable.select_all"),
+          "onUpdate:modelValue": (value: boolean | "indeterminate") => table.toggleAllPageRowsSelected(value === true),
+          "aria-label": t("components.item.view.selectable.select_all"),
         }),
       cell: ({ row }) =>
         h(Checkbox, {
           modelValue: row.getIsSelected(),
-          "onUpdate:modelValue": (value: boolean) => row.toggleSelected(!!value),
-          ariaLabel: t("components.item.view.selectable.select_row"),
+          "onUpdate:modelValue": (value: boolean | "indeterminate") => row.toggleSelected(value === true),
+          "aria-label": t("components.item.view.selectable.select_row"),
         }),
       enableHiding: false,
     },

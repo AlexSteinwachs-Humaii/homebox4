@@ -87,6 +87,8 @@
   );
 
   const table = useVueTable<EntitySummary>({
+    // Never let a selected row index refer to a different item after a refresh.
+    getRowId: item => item.id,
     manualPagination: !!props.externalPagination,
 
     get data() {
@@ -129,6 +131,17 @@
       },
     },
   });
+
+  // Selection is scoped to the currently loaded result set, including URL/back
+  // navigation and collection changes that do not go through the page buttons.
+  watch(
+    () => props.data,
+    () => {
+      table.resetRowSelection();
+      table.resetExpanded();
+    },
+    { flush: "sync" }
+  );
 
   const persistHeaders = () => {
     const headers = table
