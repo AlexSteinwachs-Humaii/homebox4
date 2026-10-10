@@ -5,10 +5,12 @@
   import DateTime from "~/components/global/DateTime.vue";
   import { maintenanceCalendarDate, useMaintenanceSchedule } from "~/composables/use-maintenance-schedule";
   import { defineObserver } from "~/composables/use-api";
+  import { useMaintenanceContext } from "~/composables/use-maintenance-context";
 
   const preferences = useViewPreferences();
   const collectionId = computed(() => preferences.value.collectionId);
   const { entries, loading, failed, refresh } = useMaintenanceSchedule(collectionId, () => useUserApi().maintenance);
+  const { items, contextEntry, contextItem } = useMaintenanceContext(collectionId, entries, () => useUserApi().items);
   onServerEvent(ServerEvent.EntityMutation, () => void refresh());
   const removeObserver = defineObserver("maintenance-schedule", {
     handler: (response, request) => {
@@ -80,6 +82,30 @@
               <p v-else class="text-sm text-muted-foreground">
                 {{ $t("maintenance.schedule.item_unavailable") }}
               </p>
+              <div class="text-sm text-muted-foreground">
+                <template v-if="items[entry.itemID]">
+                  <NuxtLink
+                    v-if="items[entry.itemID]?.location"
+                    :to="`/location/${items[entry.itemID]?.location?.id}`"
+                    class="underline"
+                  >
+                    {{ items[entry.itemID]?.location?.name }}
+                  </NuxtLink>
+                  <span v-else>{{ $t("maintenance.schedule.no_location") }}</span>
+                  <span
+                    v-if="
+                      items[entry.itemID]?.parent &&
+                      items[entry.itemID]?.parent?.id !== items[entry.itemID]?.location?.id
+                    "
+                  >
+                    · {{ $t("maintenance.schedule.inside") }}
+                    <NuxtLink :to="`/item/${items[entry.itemID]?.parent?.id}`" class="underline">{{
+                      items[entry.itemID]?.parent?.name
+                    }}</NuxtLink>
+                  </span>
+                </template>
+                <span v-else>{{ $t("maintenance.schedule.context_unavailable") }}</span>
+              </div>
               <p class="whitespace-pre-wrap break-words text-sm text-muted-foreground">
                 {{ entry.description || $t("maintenance.schedule.no_description") }}
               </p>
@@ -87,7 +113,25 @@
           </li>
         </ul>
       </BaseCard>
-      <BaseCard class="p-6">
+      <BaseCard class="min-w-0 space-y-4 p-6">
+        <template v-if="contextEntry">
+          <h2 class="font-serif text-2xl">
+            {{ $t("maintenance.schedule.item_context") }}
+          </h2>
+          <template v-if="contextItem">
+            <h3 class="break-words font-semibold">{{ contextItem.name }}</h3>
+            <p class="whitespace-pre-wrap break-words text-sm text-muted-foreground">
+              {{ contextItem.description || $t("maintenance.schedule.no_description") }}
+            </p>
+            <NuxtLink :to="`/item/${contextItem.id}`" class="block text-primary underline">{{
+              $t("maintenance.schedule.open_item")
+            }}</NuxtLink>
+          </template>
+          <p v-else class="text-sm text-muted-foreground">
+            {{ $t("maintenance.schedule.context_unavailable") }}
+          </p>
+          <hr />
+        </template>
         <h2 class="mb-3 font-serif text-2xl">
           {{ $t("maintenance.schedule.read_only") }}
         </h2>

@@ -876,6 +876,12 @@
             "unnamed": "Unnamed task",
             "unnamed_item": "Unnamed item",
             "item_unavailable": "Associated item unavailable",
+            "context_unavailable": "Item and location context unavailable",
+            "no_location": "No location recorded",
+            "inside": "Inside",
+            "item_context": "Recorded task item",
+            "open_item": "Open item details",
+            "view_inventory": "View Inventory",
             "no_description": "No description recorded",
             "read_only": "A schedule, not a score.",
             "read_only_help": "This is a read-only view of recorded tasks. Open the associated item for its details and existing maintenance log."
