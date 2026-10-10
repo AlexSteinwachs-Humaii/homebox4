@@ -7,7 +7,7 @@ export interface FlatTreeItem {
   treeString: string;
 }
 
-function flatTree(tree: TreeItem[]): FlatTreeItem[] {
+export function flatTree(tree: TreeItem[]): FlatTreeItem[] {
   const v = [] as FlatTreeItem[];
 
   // turns the nested items into a flat items array where

@@ -5,7 +5,7 @@ test.use({ actionTimeout: 15000 });
 test.setTimeout(90000);
 const expect = baseExpect.configure({ timeout: 30000 });
 
-test("each record and location has its own destination; Add opens the existing form", async ({ page }) => {
+test("each record and location has its own destination; Add opens routed capture", async ({ page }) => {
   await inventoryFixture(page);
   await page.goto("/items");
   for (const id of [0, 1, 11]) {
@@ -27,6 +27,9 @@ test("each record and location has its own destination; Add opens the existing f
   await expect(page.getByText("Purchase price / unit", { exact: true })).toBeVisible();
   await expect(page.getByText("Showing 12 of 25 item records").first()).toBeVisible();
   await page.getByRole("button", { name: "Add an item", exact: true }).click();
+  await expect(page).toHaveURL(/\/items\/new$/);
+  await expect(page.getByRole("heading", { name: "Item information" })).toBeVisible();
+  await page.getByRole("button", { name: "Open advanced creation" }).click();
   await expect(page.getByRole("dialog")).toBeVisible();
   await expect(page.getByRole("dialog").getByRole("textbox").first()).toBeVisible();
 });

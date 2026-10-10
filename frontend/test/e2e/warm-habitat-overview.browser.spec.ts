@@ -46,17 +46,23 @@ test("View all links reach Inventory and Locations; tags remain a count, not a n
   await expect(page).toHaveURL(/\/locations$/);
 });
 
-test("both Add item entry points and Create location retain the existing dialogs", async ({ page }) => {
+test("both Add item entry points reach capture; advanced creation and Create location retain dialogs", async ({
+  page,
+}) => {
   await overviewFixture(page);
   await page.goto("/home");
   const add = page.getByRole("button", { name: "Add an item", exact: true });
   await expect(add).toHaveCount(2);
   for (let index = 0; index < 2; index++) {
     await add.nth(index).click();
+    await expect(page).toHaveURL(/\/items\/new$/);
+    await expect(page.getByRole("heading", { name: "Item information" })).toBeVisible();
+    await page.getByRole("button", { name: "Open advanced creation" }).click();
     await expect(page.getByRole("dialog")).toBeVisible();
     await expect(page.getByRole("dialog").getByText("Item", { exact: true }).first()).toBeVisible();
     await page.keyboard.press("Escape");
     await expect(page.getByRole("dialog")).toHaveCount(0);
+    await page.goto("/home");
   }
   await page.getByRole("button", { name: "Create a location", exact: true }).click();
   await expect(page.getByRole("dialog")).toBeVisible();

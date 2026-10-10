@@ -84,9 +84,7 @@
         <Button variant="outline" @click="openDialog(DialogID.Scanner)"
           ><ScanLine class="mr-2 size-4" />{{ t("menu.scanner") }}</Button
         >
-        <Button @click="openDialog(DialogID.CreateEntity, { params: { baseType: 'item' } })"
-          ><Plus class="mr-2 size-4" />{{ t("home.add_item") }}</Button
-        >
+        <Button @click="navigateTo('/items/new')"><Plus class="mr-2 size-4" />{{ t("home.add_item") }}</Button>
       </template>
     </ItemContext>
 
@@ -95,7 +93,9 @@
       <div class="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
         <Panel v-for="stat in stats" :key="stat.label" class="relative space-y-3 p-5">
           <h2 class="font-sans text-sm text-muted-foreground">
-            <NuxtLink v-if="stat.to" :to="stat.to" class="habitat-link after:absolute after:inset-0">{{ stat.label }}</NuxtLink>
+            <NuxtLink v-if="stat.to" :to="stat.to" class="habitat-link after:absolute after:inset-0">{{
+              stat.label
+            }}</NuxtLink>
             <template v-else>{{ stat.label }}</template>
           </h2>
           <p class="text-3xl font-bold tabular-nums">{{ stat.value ?? "—" }}</p>
@@ -171,11 +171,7 @@
             <button
               type="button"
               class="flex w-full items-center gap-3 py-4 text-left text-sm"
-              @click="
-                openDialog(DialogID.CreateEntity, {
-                  params: { baseType: 'item' },
-                })
-              "
+              @click="navigateTo('/items/new')"
             >
               <Plus class="size-4" />{{ t("home.add_item") }}<ArrowRight class="ml-auto size-4 text-link" />
             </button>
@@ -223,7 +219,9 @@
                 <Thumbnail :src="imageUrl(location)" :name="location.name" :fallback-label="t('home.no_photo')" />
                 <span class="min-w-0 flex-1">
                   <span class="block break-words">{{ location.name }}</span>
-                  <span v-if="location.description" class="block break-words text-sm text-muted-foreground">{{ location.description }}</span>
+                  <span v-if="location.description" class="block break-words text-sm text-muted-foreground">{{
+                    location.description
+                  }}</span>
                 </span>
                 <ArrowRight class="size-4 shrink-0 text-link" aria-hidden="true" />
               </NuxtLink>

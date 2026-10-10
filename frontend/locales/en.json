@@ -497,6 +497,25 @@
         "entity_type": "Entity Type",
         "retry": "Retry"
     },
+    "capture": {
+        "subtitle": "Give your new possession a place in your collection.",
+        "item_information": "Item information",
+        "name_required": "Name *",
+        "type_required": "Entity type *",
+        "location_required": "A location in this collection is required.",
+        "optional": "optional",
+        "price_currency": "Purchase price ({currency})",
+        "loading": "Loading collection options…",
+        "load_failed": "Could not load item form options",
+        "retry_help": "Check your connection and retry. Your entered values are retained.",
+        "no_photo": "No photo yet. Add attachments from item details after saving, or use advanced creation to upload photos now.",
+        "start_simple": "Start simple.",
+        "help": "A clear name and location make this item easier to find later. Purchase details and tags are optional.",
+        "advanced_help": "Need templates, barcode scanning, photos, or a new location? These remain available in advanced creation. It opens a separate form and does not copy these entries.",
+        "advanced": "Open advanced creation",
+        "save_pending": "Saving this form will be enabled with the capture persistence step. Advanced creation is available now.",
+        "save_item": "Save item"
+    },
     "home": {
         "overview_description": "A clear picture of everything you keep.",
         "item_records": "Item records",
