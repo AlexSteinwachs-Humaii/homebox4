@@ -499,6 +499,7 @@
     },
     "capture": {
         "saved_title": "Item saved",
+        "add_another": "Add another item",
         "saved_message": "{name} has been added to your collection. Its recorded details are shown below.",
         "subtitle": "Give your new possession a place in your collection.",
         "item_information": "Item information",

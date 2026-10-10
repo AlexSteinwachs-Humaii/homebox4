@@ -611,7 +611,15 @@
                 </div>
               </div>
             </div>
-            <div class="ml-auto mt-2 flex flex-wrap items-center justify-between gap-2">
+            <div v-if="showSavedConfirmation && !hasNested" class="ml-auto mt-2 flex flex-wrap gap-3">
+              <Button as-child variant="outline">
+                <NuxtLink to="/items">{{ $t("items.back_to_inventory") }}</NuxtLink>
+              </Button>
+              <Button as-child>
+                <NuxtLink to="/items/new">{{ $t("capture.add_another") }}</NuxtLink>
+              </Button>
+            </div>
+            <div v-else class="ml-auto mt-2 flex flex-wrap items-center justify-between gap-2">
               <LabelMaker
                 v-if="typeof item.assetId === 'string' && item.assetId != ''"
                 :id="item.assetId"
@@ -655,7 +663,7 @@
         </header>
       </Card>
 
-      <div class="mb-6 mt-3 flex flex-wrap items-center justify-between">
+      <div v-if="!showSavedConfirmation || hasNested" class="mb-6 mt-3 flex flex-wrap items-center justify-between">
         <ButtonGroup>
           <Button
             v-for="tab in tabs"

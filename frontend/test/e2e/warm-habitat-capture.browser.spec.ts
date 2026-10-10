@@ -46,7 +46,14 @@ async function fixture(page: Page) {
       },
     });
   });
-  let persisted = { id: "captured", name: "Recovery lamp", fields: [], tags: [], children: [], attachments: [] };
+  let persisted = {
+    id: "captured",
+    name: "Recovery lamp",
+    fields: [],
+    tags: [],
+    children: [],
+    attachments: [],
+  };
   await page.route("**/api/v1/entities/captured", async route => {
     if (route.request().method() !== "PUT") {
       if (state.rejectRead) return route.fulfill({ status: 403, json: { error: "forbidden" } });
@@ -73,7 +80,7 @@ async function fill(page: Page) {
   await page.getByLabel("Name *", { exact: false }).fill("Recovery lamp");
   await page.getByLabel("Description", { exact: false }).fill("Retained description");
   await page.getByLabel("Purchased From", { exact: false }).fill("Real shop");
-  await page.getByLabel("Purchase price (USD)", { exact: true }).fill("0");
+  await page.getByLabel(/Purchase price/).fill("0");
 }
 async function retained(page: Page) {
   await expect(page.getByLabel("Name *", { exact: false })).toHaveValue("Recovery lamp");
@@ -185,6 +192,68 @@ test("saved confirmation uses authorized recorded values and cannot be replayed 
   await expect(page.getByRole("status", { name: "Item saved", exact: true })).toHaveCount(0);
 });
 
+test("saved next actions start a fresh capture and keep the selected collection", async ({ page }) => {
+  const state = await fixture(page);
+  await fill(page);
+  await page.getByRole("button", { name: "Save item", exact: true }).click();
+  await expect(page.getByRole("status", { name: "Item saved", exact: true })).toBeVisible();
+  const back = page.getByRole("link", {
+    name: "Back to Inventory",
+    exact: true,
+  });
+  await expect(back).toHaveCount(2);
+  for (const link of await back.all()) await expect(link).toHaveAttribute("href", "/items");
+  const another = page.getByRole("link", {
+    name: "Add another item",
+    exact: true,
+  });
+  await expect(another).toHaveAttribute("href", "/items/new");
+  await another.click();
+  await expect(page).toHaveURL(/\/items\/new$/);
+  await fresh(page);
+  expect(state.creates).toBe(1);
+  expect(state.updates).toBe(1);
+  await page
+    .getByRole("combobox", {
+      name: "Select Collection: First collection",
+      exact: true,
+    })
+    .first()
+    .click();
+  await page.getByRole("option", { name: "Second collection" }).click();
+  await fill(page);
+  await page.getByRole("combobox", { name: "Parent Location", exact: true }).click();
+  await page.getByRole("option", { name: /Actual office/ }).click();
+  await page.getByRole("button", { name: "Save item", exact: true }).click();
+  await expect(page.getByRole("status", { name: "Item saved", exact: true })).toBeVisible();
+  expect(state.tenants).toEqual(["a", "a", "b", "b"]);
+  await page.getByRole("link", { name: "Back to Inventory", exact: true }).last().click();
+  await expect(page).toHaveURL(/\/items$/);
+  await expect(
+    page
+      .getByRole("combobox", {
+        name: "Select Collection: Second collection",
+        exact: true,
+      })
+      .first()
+  ).toBeVisible();
+  expect(state.creates).toBe(2);
+  expect(state.updates).toBe(2);
+});
+
+async function fresh(page: Page) {
+  await expect(page.getByRole("heading", { name: "Item information" })).toBeVisible();
+  await expect(page.getByLabel("Name *", { exact: false })).toHaveValue("");
+  await expect(page.getByLabel("Description", { exact: false })).toHaveValue("");
+  await expect(page.getByLabel("Purchased From", { exact: false })).toHaveValue("");
+  await expect(page.getByLabel(/Purchase price/)).toHaveValue("");
+  await expect(page.getByLabel("Quantity", { exact: true })).toHaveValue("1");
+  await expect(page.locator(".dp__input")).toHaveValue("");
+  await expect(page.getByLabel("Insured", { exact: true })).not.toBeChecked();
+  await expect(page.getByText("Journey lighting", { exact: true })).toHaveCount(0);
+  await expect(page.getByRole("status", { name: "Item saved", exact: true })).toHaveCount(0);
+}
+
 test("partial save and unauthorized confirmation fetch cannot show success", async ({ page }) => {
   const state = await fixture(page);
   await fill(page);
@@ -243,7 +312,12 @@ for (const entry of ["/home", "/items"]) {
     expect(locationResponse.status()).toBe(201);
     const location = await locationResponse.json();
     const tagResponse = await page.request.post("/api/v1/tags", {
-      data: { name: "Journey lighting", description: "", color: "#123456", icon: "" },
+      data: {
+        name: "Journey lighting",
+        description: "",
+        color: "#123456",
+        icon: "",
+      },
     });
     expect(tagResponse.status()).toBe(201);
     const tag = await tagResponse.json();
@@ -276,8 +350,21 @@ for (const entry of ["/home", "/items"]) {
     await page.getByRole("button", { name: "Save item", exact: true }).dblclick();
     const record = await (await created).json();
     await expect(page).toHaveURL(new RegExp(`/item/${record.id}$`));
-    await page.getByRole("link", { name: "Back to Inventory", exact: true }).click();
+    await expect(page.getByRole("status", { name: "Item saved", exact: true })).toContainText(
+      "Persistent journey lamp"
+    );
+    if (entry === "/home") {
+      await page.getByRole("link", { name: "Add another item", exact: true }).click();
+      await expect(page).toHaveURL(/\/items\/new$/);
+      await fresh(page);
+      // Leaving a new blank form does not write or delete either entity.
+      await page.getByRole("button", { name: "Cancel", exact: true }).click();
+    } else {
+      await page.getByRole("link", { name: "Back to Inventory", exact: true }).last().click();
+    }
     await expect(page).toHaveURL(/\/items$/);
+    await expect(page.locator(`a[href='/item/${record.id}']`)).toBeVisible();
+    await page.reload();
     await page.locator(`a[href='/item/${record.id}']`).getByRole("heading").click();
     await expect(page).toHaveURL(new RegExp(`/item/${record.id}$`));
     await page.reload();
@@ -301,7 +388,9 @@ for (const entry of ["/home", "/items"]) {
       purchaseDate: localDate,
       insured: true,
       parent: { id: location.id },
-      entityType: { id: types.find((type: { isLocation: boolean }) => !type.isLocation).id },
+      entityType: {
+        id: types.find((type: { isLocation: boolean }) => !type.isLocation).id,
+      },
       tags: [{ id: tag.id }],
     });
     const rows = page.locator("dl > div");
@@ -311,5 +400,22 @@ for (const entry of ["/home", "/items"]) {
     const listing = await (await page.request.get("/api/v1/entities?q=Persistent%20journey%20lamp")).json();
     expect(listing.items.filter((item: { id: string }) => item.id === record.id)).toHaveLength(1);
     expect(listing.items).toHaveLength(1);
+    await page.getByRole("link", { name: "Overview", exact: true }).first().click();
+    await expect(page).toHaveURL(/\/home$/);
+    await expect(page.locator(`a[href='/item/${record.id}']`)).toBeVisible();
+    const statistics = page.getByRole("region", { name: "Quick statistics" });
+    await expect(statistics).not.toHaveAttribute("aria-busy", "true");
+    await expect(
+      statistics.getByRole("link", { name: "Item records", exact: true }).locator("../..").locator("p").first()
+    ).toHaveText("1");
+    await page.reload();
+    await expect(page.locator(`a[href='/item/${record.id}']`)).toBeVisible();
+    await page.locator(`a[href='/item/${record.id}']`).click();
+    await expect(
+      page.getByRole("heading", {
+        name: "Persistent journey lamp",
+        exact: true,
+      })
+    ).toBeVisible();
   });
 }
