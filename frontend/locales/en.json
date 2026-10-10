@@ -843,7 +843,21 @@
         "follow_trail": "Follow the location trail.",
         "trail_help": "Expand the hierarchy to explore nested places. Item containers remain in the trail when they contain a place. Open a place to browse its contents.",
         "illustration_help": "Location previews use a generic illustration, not uploaded photographs.",
-        "open_location": "Open {name}"
+        "open_location": "Open {name}",
+        "contents": {
+            "title": "Contents in this location",
+            "scope": "Directly in this location",
+            "scope_help": "Direct children only. Items inside child places or containers are not included.",
+            "trail": "Location trail",
+            "local_context": "Storage place",
+            "empty": "No item records directly in this location. Child places may contain items.",
+            "unavailable": "This location is unavailable or you do not have access to it.",
+            "select_collection": "Select a collection to view this location.",
+            "total": "{total} direct item records · Quantities describe physical units, not record counts.",
+            "previous": "Previous",
+            "next": "Next",
+            "details": "Location details and actions"
+        }
     },
     "maintenance": {
         "filter": {
